@@ -50,7 +50,7 @@ void ufold_vm_free(ufold_vm_t* vm);
 /*\
  / DESCRIPTION
  /   Output remaining text in the buffer and stop the VM.
- /   All second stop will always succeed.
+ /   A second stop will always succeed.
  /
  / RETURN
  /    true :: success
