@@ -1,12 +1,13 @@
 MAX_WIDTH := 78
 TAB_WIDTH := 8
 
-OBJECTS := build/ufold.a $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
+OBJECTS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
+OBJECTS += build/ufold build/ufold.a
 OBJECTS += utf8proc/libutf8proc.a
 
 unexport CFLAGS
 override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
-		   -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH}
+                   -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH}
 
 ifndef DEBUG
     override CFLAGS += -O2 -DNDEBUG
@@ -14,7 +15,7 @@ else
     override CFLAGS += -O0 -g
 endif
 
-all: ufold
+all: ufold build/ufold.a
 
 ufold: build/ufold
 
