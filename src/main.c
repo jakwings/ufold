@@ -16,7 +16,7 @@
 #define ISSUES "https://github.com/jakwings/ufold/issues"
 
 #define warn(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", __VA_ARGS__)
-#define BUF_SIZE 4096
+
 #define P PROGRAM
 
 const char* manual =
@@ -238,13 +238,19 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
 static bool wrap_input(ufold_vm_t* vm, FILE* stream)
 {
-    uint8_t buffer[BUF_SIZE];
-    size_t size;
+    char* line = NULL;
+    size_t capacity = 0;
+    ssize_t size = -1;
 
-    while ((size = fread(buffer, 1, BUF_SIZE, stream)) > 0)
-        if (!ufold_vm_feed(vm, buffer, size))
+    while ((size = getline(&line, &capacity, stream)) > 0) {
+        if (!ufold_vm_feed(vm, line, size)) {
+            free(line);
             return false;
-    return true;
+        }
+    }
+    free(line);
+
+    return !ferror(stream);
 }
 
 int main(int argc, char** argv)
