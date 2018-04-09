@@ -20,7 +20,7 @@ typedef void* (*ufold_vm_realloc_t)(void* ptr, size_t size);
 //\ VM Configuration
 typedef struct ufold_vm_config_struct {
     ufold_vm_write_t write;      // writer for output (NULL: provided default)
-    ufold_vm_realloc_t realloc;  // memory realloctor (NULL: provided default)
+    ufold_vm_realloc_t realloc;  // memory reallocator (NULL: provided default)
     size_t max_width;            // maximum columns allowed for text
     size_t tab_width;            // maximum columns allowed for tab
     bool keep_indentation;       // whether to keep indentation for wrapped text
@@ -50,6 +50,7 @@ void ufold_vm_free(ufold_vm_t* vm);
 /*\
  / DESCRIPTION
  /   Output remaining text in the buffer and stop the VM.
+ /   All second stop will always succeed.
  /
  / RETURN
  /    true :: success
@@ -60,6 +61,7 @@ bool ufold_vm_stop(ufold_vm_t* vm);
 /*\
  / DESCRIPTION
  /   Feed input into the VM and output transformed text.
+ /   Stopping an already stopped VM will also return false.
  /
  / RETURN
  /    true :: success
