@@ -23,6 +23,8 @@ ______________________________________________________________________________
 
          When no file is specified, read from standard input.
 
+         The letter u in the name stands for UTF-8, a superset of ASCII.
+
          -w, --width <width>
                 Maximum columns for each line. Default: 78.
                 Setting it to zero prevents wrapping.
@@ -49,10 +51,19 @@ ______________________________________________________________________________
          --
                 All arguments after two dashes are not treated as options.
 
-         ufold will concatenate all files' content as if there is only a 
+         ufold will concatenate all files' content as if there is only a
          single source of input. i.e these two bash commands are equivalent:
                 ufold file1 file2 ;
                 cat file1 file2 | ufold ;
+
+         More to note:
+                When the indent occupies no less columns than the maximum,
+                the corresponding line will not be wrapped but kept as is.
+
+                Byte sequences that are not conforming with for UTF-8
+                encoding will be filtered before output. The --bytes (-b)
+                option will enforce the ASCII encoding in order to sanitize
+                the input.
 
   COPYRIGHT
          Copyright (c) 2018 J.W https://github.com/jakwings/ufold

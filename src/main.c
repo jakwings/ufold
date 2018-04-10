@@ -19,7 +19,7 @@
 
 #define P PROGRAM
 
-const char* manual =
+const char* const manual =
 "\n"
 "  NAME\n"
 "         " P " -- wrap each input line to fit in specified width\n"
@@ -40,6 +40,8 @@ const char* manual =
 "         Wrap input lines from files and write to standard output.\n"
 "\n"
 "         When no file is specified, read from standard input.\n"
+"\n"
+"         The letter u in the name stands for UTF-8, a superset of ASCII.\n"
 "\n"
 "         -w, --width <width>\n"
 "                Maximum columns for each line. Default: 78.\n"
@@ -73,6 +75,14 @@ const char* manual =
 "                " P " file1 file2 ;\n"
 "                cat file1 file2 | " P " ;\n"
 "\n"
+"         More to note:\n"
+"                When the indent occupies no less columns than the maximum,"
+                " the corresponding line will not be wrapped but kept as is.\n"
+"\n"
+"                Byte sequences that are not conforming with for UTF-8 encoding"
+                " will be filtered before output. The --bytes (-b) option will"
+                " enforce the ASCII encoding in order to sanitize the input.\n"
+"\n"
 "  COPYRIGHT\n"
 "         " COPYRIGHT "\n"
 "\n"
@@ -80,7 +90,7 @@ const char* manual =
 "\n"
 ;
 
-const char* usage =
+const char* const usage =
 "USAGE\n"
 "    ufold [option]... [file]...\n"
 "\n"
@@ -145,6 +155,9 @@ static bool parse_integer(const char* str, size_t* num)
 static void print_manual(ufold_vm_config_t config)
 {
     config.write = write_to_stdout;
+    config.keep_indentation = true;
+    config.break_at_spaces = true;
+    config.truncate_bytes = false;
 
     exit(vwrite(manual, strlen(manual), config) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -152,8 +165,11 @@ static void print_manual(ufold_vm_config_t config)
 static void print_help(bool error, ufold_vm_config_t config)
 {
     config.write = error ? write_to_stderr : write_to_stdout;
-    error = !vwrite(usage, strlen(usage), config) || error;
+    config.keep_indentation = true;
+    config.break_at_spaces = true;
+    config.truncate_bytes = false;
 
+    error = !vwrite(usage, strlen(usage), config) || error;
     exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
