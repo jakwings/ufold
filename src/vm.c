@@ -37,7 +37,7 @@ struct ufold_vm_struct {
 };
 //typedef struct ufold_vm_struct ufold_vm_t;
 
-static bool default_write(const void* ptr, const size_t size);
+static bool default_write(const void* ptr, size_t size);
 
 static void* default_realloc(void* ptr, size_t size);
 
@@ -45,13 +45,13 @@ static void vm_free(ufold_vm_t* vm, void* ptr);
 
 static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output);
 
-static void vm_slot_shift(ufold_vm_t* vm, const size_t n);
+static void vm_slot_shift(ufold_vm_t* vm, size_t n);
 
-static void vm_line_shift(ufold_vm_t* vm, const size_t n, const size_t width);
+static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width);
 
 static bool vm_line_update_width(ufold_vm_t* vm);
 
-static bool vm_feed(ufold_vm_t* vm, const uint8_t* input, const size_t size);
+static bool vm_feed(ufold_vm_t* vm, const uint8_t* input, size_t size);
 
 static bool vm_dump(ufold_vm_t* vm);
 
@@ -61,7 +61,7 @@ static bool vm_indent(ufold_vm_t* vm);
  / DESCRIPTION
  /   Default Writer for Output
 \*/
-static bool default_write(const void* ptr, const size_t size)
+static bool default_write(const void* ptr, size_t size)
 {
     return (size > 0) ? (fwrite(ptr, size, 1, stdout) == 1) : true;
 }
@@ -154,7 +154,7 @@ bool ufold_vm_stop(ufold_vm_t* vm)
     return true;
 }
 
-bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, const size_t size)
+bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 {
     if (vm->stopped) {
         fail();
@@ -162,20 +162,20 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, const size_t size)
 
     for (size_t i = 0; i < size; i++) {
         const uint8_t* input = (const uint8_t*)bytes + i;
-        size_t size = 0;
+        size_t n = 0;
 
         do {
             uint8_t output[SLOT_SIZE] = {0};
 
-            size = vm_slot(vm, input, output);
-            size = utf8_sanitize(output, size, vm->config.truncate_bytes);
+            n = vm_slot(vm, input, output);
+            n = utf8_sanitize(output, n, vm->config.truncate_bytes);
             input = NULL;
 
-            if (size > 0 && !vm_feed(vm, output, size)) {
+            if (n > 0 && !vm_feed(vm, output, n)) {
                 vm->stopped = true;
                 fail();
             }
-        } while (size > 0);
+        } while (n > 0);
     }
 
     return true;
@@ -247,7 +247,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
  / DESCRIPTION
  /   Shift the VM's buffer queuing slots by N places.
 \*/
-static void vm_slot_shift(ufold_vm_t* vm, const size_t n)
+static void vm_slot_shift(ufold_vm_t* vm, size_t n)
 {
     assert(vm->slot_used >= n);
 
@@ -261,13 +261,13 @@ static void vm_slot_shift(ufold_vm_t* vm, const size_t n)
  / DESCRIPTION
  /   Shift the VM's line buffer by N places.
 \*/
-static void vm_line_shift(ufold_vm_t* vm, const size_t n, const size_t width)
+static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 {
-    assert(vm->line_size >= n && vm->line_width >= width);
+    assert(vm->line_size >= size && vm->line_width >= width);
 
-    if (vm->line_size >= n && vm->line_width >= width) {
-        memmove(vm->line, vm->line + n, vm->line_size - n);
-        vm->line_size -= n;
+    if (vm->line_size >= size && vm->line_width >= width) {
+        memmove(vm->line, vm->line + size, vm->line_size - size);
+        vm->line_size -= size;
         vm->line_width -= width;
     }
 }

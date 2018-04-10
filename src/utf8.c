@@ -3,7 +3,7 @@
 #include "utils.h"
 #include "utf8.h"
 
-size_t utf8_valid_length(const uint8_t byte)
+size_t utf8_valid_length(uint8_t byte)
 {
     static const uint8_t lengths[] = {
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -13,9 +13,8 @@ size_t utf8_valid_length(const uint8_t byte)
 }
 
 // TODO: deal with surrogate? grapheme cluster?
-bool utf8_calc_width(
-        const uint8_t* bytes, const size_t size, const size_t tab_width,
-        size_t* line_offset)
+bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
+                     size_t* line_offset)
 {
     size_t new_offset = *line_offset;
     size_t offset = new_offset;  // for current line
@@ -64,7 +63,7 @@ bool utf8_calc_width(
     return true;
 }
 
-const uint8_t* utf8_validate(const uint8_t* bytes, const size_t size)
+const uint8_t* utf8_validate(const uint8_t* bytes, size_t size)
 {
     static const uint8_t masks[] = {
         0x7F,  // [0b01111111]
@@ -99,7 +98,7 @@ LOOP:
 }
 
 // TODO: deal with surrogate?
-size_t utf8_sanitize(uint8_t* bytes, const size_t size, const bool ascii)
+size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
 {
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;

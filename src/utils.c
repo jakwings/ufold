@@ -1,7 +1,7 @@
 #include "utf8.h"
 #include "utils.h"
 
-bool is_controlchar(const utf8proc_int32_t codepoint)
+bool is_controlchar(utf8proc_int32_t codepoint)
 {
     switch (codepoint) {
         case '\n': case '\t': return false;
@@ -14,14 +14,14 @@ bool is_controlchar(const utf8proc_int32_t codepoint)
          utf8proc_category(codepoint) == UTF8PROC_CATEGORY_CC);
 }
 
-bool is_whitespace(const utf8proc_int32_t codepoint)
+bool is_whitespace(utf8proc_int32_t codepoint)
 {
     return codepoint == ' ' || codepoint == '\t' ||
         (utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS &&
          !is_linefeed(codepoint));
 }
 
-bool is_linefeed(const utf8proc_int32_t codepoint)
+bool is_linefeed(utf8proc_int32_t codepoint)
 {
     return codepoint == '\n' ||
         // TODO: recalculate tab width
@@ -33,7 +33,7 @@ bool is_linefeed(const utf8proc_int32_t codepoint)
     // NOTE: And what about ANSI escape codes?
 }
 
-bool has_linefeed(const uint8_t* bytes, const size_t size)
+bool has_linefeed(const uint8_t* bytes, size_t size)
 {
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;
@@ -55,7 +55,7 @@ bool has_linefeed(const uint8_t* bytes, const size_t size)
     return false;
 }
 
-bool find_eol(const uint8_t* bytes, const size_t size, const size_t tab_width,
+bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
               const uint8_t** index, size_t* line_width, bool* linefeed_found)
 {
     const uint8_t* new_index = bytes;
@@ -90,8 +90,8 @@ bool find_eol(const uint8_t* bytes, const size_t size, const size_t tab_width,
     return true;
 }
 
-bool skip_width(const uint8_t* bytes, const size_t size,
-                const size_t tab_width, const size_t max_width,
+bool skip_width(const uint8_t* bytes, size_t size,
+                size_t tab_width, size_t max_width,
                 const uint8_t** index, size_t* line_width)
 {
     if (max_width == 0) {
@@ -136,7 +136,7 @@ bool skip_width(const uint8_t* bytes, const size_t size,
     return true;
 }
 
-bool skip_space(const uint8_t* bytes, const size_t size, const size_t tab_width,
+bool skip_space(const uint8_t* bytes, size_t size, size_t tab_width,
                 const uint8_t** index, size_t* line_width)
 {
     const uint8_t* new_index = bytes;
@@ -168,8 +168,8 @@ bool skip_space(const uint8_t* bytes, const size_t size, const size_t tab_width,
     return true;
 }
 
-bool break_line(const uint8_t* bytes, const size_t size, const bool with_space,
-                const size_t tab_width, const size_t max_width,
+bool break_line(const uint8_t* bytes, size_t size, bool with_space,
+                size_t tab_width, size_t max_width,
                 const uint8_t** last_word_end, const uint8_t** first_linefeed,
                 const uint8_t** end, size_t* line_width)
 {

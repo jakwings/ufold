@@ -12,7 +12,7 @@ typedef struct ufold_vm_struct ufold_vm_t;
 typedef struct ufold_vm_options_struct ufold_vm_options_t;
 
 //\ Writer for Output
-typedef bool (*ufold_vm_write_t)(const void* ptr, const size_t size);
+typedef bool (*ufold_vm_write_t)(const void* ptr, size_t size);
 
 //\ Memory Reallocator
 typedef void* (*ufold_vm_realloc_t)(void* ptr, size_t size);
@@ -67,6 +67,6 @@ bool ufold_vm_stop(ufold_vm_t* vm);
  /    true :: success
  /   false :: failure
 \*/
-bool ufold_vm_feed(ufold_vm_t* vm, const void* input, const size_t size);
+bool ufold_vm_feed(ufold_vm_t* vm, const void* input, size_t size);
 
 #endif  /* UFOLD_VM_H */

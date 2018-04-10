@@ -16,13 +16,13 @@
 #define fail() return false
 #endif
 
-bool is_controlchar(const utf8proc_int32_t codepoint);
+bool is_controlchar(utf8proc_int32_t codepoint);
 
-bool is_whitespace(const utf8proc_int32_t codepoint);
+bool is_whitespace(utf8proc_int32_t codepoint);
 
-bool is_linefeed(const utf8proc_int32_t codepoint);
+bool is_linefeed(utf8proc_int32_t codepoint);
 
-bool has_linefeed(const uint8_t* bytes, const size_t size);
+bool has_linefeed(const uint8_t* bytes, size_t size);
 
 /*\
  / DESCRIPTION
@@ -38,7 +38,7 @@ bool has_linefeed(const uint8_t* bytes, const size_t size);
  /    true :: success
  /   false :: failure
 \*/
-bool find_eol(const uint8_t* bytes, const size_t size, const size_t tab_width,
+bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
               const uint8_t** index, size_t* line_width, bool* linefeed_found);
 
 /*\
@@ -55,8 +55,8 @@ bool find_eol(const uint8_t* bytes, const size_t size, const size_t tab_width,
  /    true :: success
  /   false :: failure
 \*/
-bool skip_width(const uint8_t* bytes, const size_t size,
-                const size_t tab_width, const size_t max_width,
+bool skip_width(const uint8_t* bytes, size_t size,
+                size_t tab_width, size_t max_width,
                 const uint8_t** index, size_t* line_width);
 
 /*\
@@ -72,7 +72,7 @@ bool skip_width(const uint8_t* bytes, const size_t size,
  /    true :: success
  /   false :: failure
 \*/
-bool skip_space(const uint8_t* bytes, const size_t size, const size_t tab_width,
+bool skip_space(const uint8_t* bytes, size_t size, size_t tab_width,
                 const uint8_t** index, size_t* line_width);
 
 /*\
@@ -92,8 +92,8 @@ bool skip_space(const uint8_t* bytes, const size_t size, const size_t tab_width,
  /    true :: success
  /   false :: failure
 \*/
-bool break_line(const uint8_t* bytes, const size_t size, const bool with_space,
-                const size_t tab_width, const size_t max_width,
+bool break_line(const uint8_t* bytes, size_t size, bool with_space,
+                size_t tab_width, size_t max_width,
                 const uint8_t** last_word_end, const uint8_t** first_linefeed,
                 const uint8_t** end, size_t* line_width);
 

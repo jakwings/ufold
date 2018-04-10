@@ -107,12 +107,12 @@ const char* const usage =
 "    -V, --version        Show version information.\n"
 ;
 
-static bool write_to_stdout(const void* s, const size_t n)
+static bool write_to_stdout(const void* s, size_t n)
 {
     return (n > 0) ? (fwrite(s, n, 1, stdout) == 1) : true;
 }
 
-static bool write_to_stderr(const void* s, const size_t n)
+static bool write_to_stderr(const void* s, size_t n)
 {
     return (n > 0) ? (fwrite(s, n, 1, stderr) == 1) : true;
 }
