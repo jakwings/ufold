@@ -19,7 +19,7 @@
 
 #define P PROGRAM
 
-const char* const manual =
+static const char* const manual =
 "\n"
 "  NAME\n"
 "         " P " -- wrap each input line to fit in specified width\n"
@@ -94,7 +94,7 @@ const char* const manual =
 "\n"
 ;
 
-const char* const usage =
+static const char* const usage =
 "USAGE\n"
 "    ufold [option]... [file]...\n"
 "\n"
@@ -303,7 +303,7 @@ int main(int argc, char** argv)
     if (vm == NULL) goto FAIL;
 
     if (argc > 0) {
-        for (size_t i = 0; i < argc; i++) {
+        for (int i = 0; i < argc; i++) {
             if ((stream = fopen(argv[i], "rb")) == NULL) goto FAIL;
             if (!wrap_input(vm, stream)) goto FAIL;
             if (fclose(stream) != 0) goto FAIL;

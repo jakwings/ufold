@@ -212,7 +212,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
     if (taint != NULL) {
         assert(vm->slots <= taint && taint < vm->slots + vm->slot_used);
 
-        size_t size = 1 + taint - vm->slots;
+        size_t size = 1 + (taint - vm->slots);
 
         if (utf8_valid_length(*taint) > 0) {
             assert(taint != vm->slots);
