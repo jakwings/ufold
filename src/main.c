@@ -48,7 +48,7 @@ const char* const manual =
 "                Setting it to zero prevents wrapping.\n"
 "\n"
 "         -t, --tab <width>\n"
-"                Maximum columns for each TAB character. Default: 8\n"
+"                Maximum columns for each TAB character. Default: 8.\n"
 "                Terminals may not support zero-width TABs.\n"
 "\n"
 "         -i, --indent\n"
@@ -77,11 +77,14 @@ const char* const manual =
 "\n"
 "         More to note:\n"
 "                When the indent occupies no less columns than the maximum,"
-                " the corresponding line will not be wrapped but kept as is.\n"
+                 " the corresponding line will not be wrapped but kept as is.\n"
+"\n"
+"                When a fragment contaning no spaces exceeds the maximum width,"
+                 " there will be a hard break inside the text.\n"
 "\n"
 "                Byte sequences that are not conforming with UTF-8 encoding"
-                " will be filtered before output. The --bytes (-b) option will"
-                " enforce the ASCII encoding in order to sanitize the input.\n"
+                 " will be filtered before output. The --bytes (-b) option will"
+                 " enforce the ASCII encoding in order to sanitize the input.\n"
 "\n"
 "  COPYRIGHT\n"
 "         " COPYRIGHT "\n"
@@ -175,7 +178,7 @@ static void print_help(bool error, ufold_vm_config_t config)
 
 static void print_version(ufold_vm_config_t config)
 {
-    char* info = PROGRAM " " VERSION "\n\n" COPYRIGHT "\n\n" LICENSE "\n";
+    char* info = PROGRAM " " VERSION "\n" COPYRIGHT "\n" LICENSE "\n";
     config.write = write_to_stdout;
 
     exit(vwrite(info, strlen(info), config) ? EXIT_SUCCESS : EXIT_FAILURE);

@@ -30,7 +30,7 @@ ______________________________________________________________________________
                 Setting it to zero prevents wrapping.
 
          -t, --tab <width>
-                Maximum columns for each TAB character. Default: 8
+                Maximum columns for each TAB character. Default: 8.
                 Terminals may not support zero-width TABs.
 
          -i, --indent
@@ -59,6 +59,9 @@ ______________________________________________________________________________
          More to note:
                 When the indent occupies no less columns than the maximum,
                 the corresponding line will not be wrapped but kept as is.
+
+                When a fragment contaning no spaces exceeds the maximum
+                width, there will be a hard break inside the text.
 
                 Byte sequences that are not conforming with UTF-8 encoding
                 will be filtered before output. The --bytes (-b) option will
