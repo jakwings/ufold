@@ -51,8 +51,8 @@ ______________________________________________________________________________
          --
                 All arguments after two dashes are not treated as options.
 
-         ufold will concatenate all files' content as if there is only a
-         single source of input. i.e these two bash commands are equivalent:
+         The program will concatenate all files' content as if there is only
+         a single source of input, i.e these two bash commands are equivalent:
                 ufold file1 file2 ;
                 cat file1 file2 | ufold ;
 
@@ -60,11 +60,12 @@ ______________________________________________________________________________
                 When the indent occupies no less columns than the maximum,
                 the corresponding line will not be wrapped but kept as is.
 
-                When a fragment contaning no spaces exceeds the maximum
-                width, there will be a hard break inside the text.
+                When the flag --spaces (-s) is given and a fragment
+                containing no spaces exceeds the maximum width, the program
+                will still insert a hard break inside the text.
 
                 Byte sequences that are not conforming with UTF-8 encoding
-                will be filtered before output. The --bytes (-b) option will
+                will be filtered before output. The flag --bytes (-b) will
                 enforce the ASCII encoding in order to sanitize the input.
 
   COPYRIGHT
