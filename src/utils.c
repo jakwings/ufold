@@ -201,6 +201,7 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
                 word_ind = bytes + i + n_bytes;
             } else {
                 if (word_ind != NULL) {
+                    space_end = NULL;
                     word_end = word_ind;
                     alt_width = new_width;
                 }
@@ -216,18 +217,27 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
         if (next_width < new_width) {
             fail();  // TODO: '\b' and the likes, isatty()?
         }
-        if (next_width > max_width) {
-            break;
+        if (!with_space) {
+            if (next_width > max_width) {
+                break;
+            }
+        } else {
+            if (word_ind != NULL && next_width > max_width) {
+                break;
+            }
+            if (is_whitespace(codepoint)) {
+                if (next_width > max_width) {
+                    break;
+                }
+                space_end = bytes + i + n_bytes;
+                alt_width = next_width;
+            }
         }
-        new_width = next_width;
 
+        new_width = next_width;
         new_index = bytes + i + n_bytes;
 
-        if (with_space && is_whitespace(codepoint)) {
-            space_end = new_index;
-            alt_width = new_width;
-        }
-        if (is_linefeed(codepoint)) {
+        if (new_width <= max_width && is_linefeed(codepoint)) {
             linefeed = bytes + i;
             break;
         }
