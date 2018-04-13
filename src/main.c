@@ -125,7 +125,7 @@ static bool vwrite(const void* s, size_t n, ufold_vm_config_t config)
 {
     ufold_vm_t* vm = ufold_vm_new(config);
 
-    if (!ufold_vm_feed(vm, s, n) || !ufold_vm_stop(vm)) {
+    if (vm == NULL || !ufold_vm_feed(vm, s, n) || !ufold_vm_stop(vm)) {
         if (errno != 0) {
             perror(NULL);
         } else {
