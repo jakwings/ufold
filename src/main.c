@@ -131,6 +131,7 @@ static bool vwrite(const void* s, size_t n, ufold_vm_config_t config)
         } else {
             warn("unknown error, please report bugs to %s", ISSUES);
         }
+        ufold_vm_free(vm);
         return false;
     }
     ufold_vm_free(vm);
