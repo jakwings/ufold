@@ -322,7 +322,8 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
         return vm_dump(vm);
     }
 #else
-    if (vm->line_width > vm->config.max_width || has_linefeed(bytes, size)) {
+    if (vm->line_width > vm->config.max_width ||
+            vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
         return vm_dump(vm);
     }
 #endif
