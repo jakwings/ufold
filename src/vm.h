@@ -61,7 +61,7 @@ bool ufold_vm_stop(ufold_vm_t* vm);
 /*\
  / DESCRIPTION
  /   Feed input into the VM and output transformed text.
- /   Stopping an already stopped VM will also return false.
+ /   Feeding an already stopped VM will return false.
  /
  / RETURN
  /    true :: success
