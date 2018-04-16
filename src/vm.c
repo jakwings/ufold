@@ -53,7 +53,7 @@ static bool vm_line_update_width(ufold_vm_t* vm);
 
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* input, size_t size);
 
-static bool vm_dump(ufold_vm_t* vm);
+static bool vm_flush(ufold_vm_t* vm);
 
 static bool vm_indent(ufold_vm_t* vm);
 
@@ -147,11 +147,14 @@ bool ufold_vm_stop(ufold_vm_t* vm)
     if (!vm->stopped) {
         vm->stopped = true;
 
-        return vm->slot_used == 0 && vm_dump(vm);
+        return vm->slot_used == 0 && vm_flush(vm);
     }
-    vm->stopped = true;
-
     return true;
+}
+
+bool ufold_vm_flush(ufold_vm_t* vm)
+{
+    return vm_flush(vm);
 }
 
 bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
@@ -274,7 +277,7 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 
 /*\
  / DESCRIPTION
- /    Update line width, especially for TABs.
+ /   Update line width, especially for TABs.
 \*/
 static bool vm_line_update_width(ufold_vm_t* vm)
 {
@@ -302,7 +305,7 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
         vm->line_size += size;
 
         if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-            return vm_dump(vm);
+            return vm_flush(vm);
         }
         return true;
     }
@@ -319,12 +322,12 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 
 #ifdef NDEBUG
     if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        return vm_dump(vm);
+        return vm_flush(vm);
     }
 #else
     if (vm->line_width > vm->config.max_width ||
             vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        return vm_dump(vm);
+        return vm_flush(vm);
     }
 #endif
     return true;
@@ -332,9 +335,9 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 
 /*\
  / DESCRIPTION
- /    Flush all buffered content.
+ /   Flush all buffered content.
 \*/
-static bool vm_dump(ufold_vm_t* vm)
+static bool vm_flush(ufold_vm_t* vm)
 {
 #ifdef NDEBUG
     // inharmonious logic
@@ -479,7 +482,7 @@ static bool vm_dump(ufold_vm_t* vm)
 
 /*\
  / DESCRIPTION
- /    Update line indent and VM state.
+ /   Update line indent and VM state.
 \*/
 static bool vm_indent(ufold_vm_t* vm)
 {

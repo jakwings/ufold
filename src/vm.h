@@ -60,6 +60,16 @@ bool ufold_vm_stop(ufold_vm_t* vm);
 
 /*\
  / DESCRIPTION
+ /   Flush all buffered output of the VM.
+ /
+ / RETURN
+ /    true :: success
+ /   false :: failure
+\*/
+bool ufold_vm_flush(ufold_vm_t* vm);
+
+/*\
+ / DESCRIPTION
  /   Feed input into the VM and output transformed text.
  /   Feeding an already stopped VM will return false.
  /
