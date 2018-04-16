@@ -2,7 +2,7 @@ MAX_WIDTH := 78
 TAB_WIDTH := 8
 
 OBJECTS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
-OBJECTS += build/ufold build/ufold.a
+OBJECTS += build/ufold build/ufold.a build/ufold.h
 OBJECTS += utf8proc/libutf8proc.a
 
 unexport CFLAGS
@@ -15,7 +15,7 @@ else
     override CFLAGS += -O0 -g
 endif
 
-all: ufold build/ufold.a
+all: ufold build/ufold.a build/ufold.h
 
 ufold: build/ufold
 
@@ -29,6 +29,9 @@ build/ufold: src/main.c build/ufold.a
 
 build/ufold.a: build/vm.o build/utf8.o build/utils.o utf8proc/libutf8proc.a
 	libtool -static -o $@ - $^
+
+build/ufold.h: src/vm.h
+	cp src/vm.h build/ufold.h
 
 build/vm.o: src/vm.c src/vm.h src/utf8.h src/utils.h
 	${CC} ${CFLAGS} -c -o $@ $<
