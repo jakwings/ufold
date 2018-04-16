@@ -41,6 +41,8 @@ static bool default_write(const void* ptr, size_t size);
 
 static void* default_realloc(void* ptr, size_t size);
 
+static void* vm_realloc(ufold_vm_t* vm, void* ptr, size_t size);
+
 static void vm_free(ufold_vm_t* vm, void* ptr);
 
 static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output);
@@ -81,6 +83,15 @@ static void* default_realloc(void* ptr, size_t size)
 
 /*\
  / DESCRIPTION
+ /   VM's Own Memory Reallocator
+\*/
+static void* vm_realloc(ufold_vm_t* vm, void* ptr, size_t size)
+{
+    return vm->config.realloc(ptr, size);
+}
+
+/*\
+ / DESCRIPTION
  /   VM's Own Memory Deallocator
 \*/
 static void vm_free(ufold_vm_t* vm, void* ptr)
@@ -106,23 +117,29 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     assert(SLOT_SIZE >= sizeof(uint32_t));
     assert(MAX_WIDTH >= 0);
 
-    // |<------------- LINE AREA ------------->|< EXTRA >|< QUEUE >|
-    // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED QUADRUPED]
+    // |<------------- LINE AREA ------------->|< EXTRA >|
+    // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
     size_t width = (config.max_width > 0) ? config.max_width : MAX_WIDTH;
-    size_t size = sizeof(uint32_t) * width + sizeof(uint8_t) * SLOT_SIZE * 2;
+    size_t size = sizeof(uint32_t) * width + SLOT_SIZE;
 
-    uint8_t* buffer = config.realloc(NULL, size);
+    vm->line = config.realloc(NULL, size);
 
-    if (buffer == NULL) {
+    if (vm->line == NULL) {
+        vm_free(vm, vm);
         return NULL;
     }
-    memset(buffer, '\0', size);
+    vm->max_size = size - SLOT_SIZE;
+
+    vm->slots = config.realloc(NULL, SLOT_SIZE);
+
+    if (vm->slots == NULL) {
+        vm_free(vm, vm->line);
+        vm_free(vm, vm);
+        return NULL;
+    }
+    vm->slot_used = 0;
 
     vm->config = config;
-    vm->line = buffer;
-    vm->max_size = size - SLOT_SIZE * 2;
-    vm->slots = buffer + size - SLOT_SIZE;
-    vm->slot_used = 0;
     vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
@@ -138,6 +155,7 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
 void ufold_vm_free(ufold_vm_t* vm)
 {
     vm_free(vm, vm->line);
+    vm_free(vm, vm->slots);
     vm_free(vm, vm->indent);
     vm_free(vm, vm);
 }
@@ -298,6 +316,8 @@ static bool vm_line_update_width(ufold_vm_t* vm)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
+    bool done = true;
+
 #ifdef NDEBUG
     // inharmonious logic
     if (vm->config.max_width == 0) {
@@ -305,9 +325,9 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
         vm->line_size += size;
 
         if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-            return vm_flush(vm);
+            done = vm_flush(vm);
         }
-        return true;
+        goto RESIZE;
     }
 #endif
 
@@ -322,20 +342,38 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 
 #ifdef NDEBUG
     if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        return vm_flush(vm);
+        done = vm_flush(vm);
     }
 #else
-    if (vm->line_width > vm->config.max_width ||
+    if (vm->line_width >= vm->config.max_width ||
             vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        return vm_flush(vm);
+        done = vm_flush(vm);
     }
 #endif
-    return true;
+
+#ifdef NDEBUG
+RESIZE:
+#endif
+    if (vm->line_size > vm->max_size) {
+        // assume zero-width character is rare
+        size_t max_size = vm->line_size + SLOT_SIZE * 10;
+        // LINE AREA + OVERFLOW AREA
+        size_t buf_size = max_size + SLOT_SIZE;
+        uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
+
+        if (buf == NULL) {
+            fail();
+        }
+        vm->line = buf;
+        vm->max_size = max_size;
+    }
+
+    return done;
 }
 
 /*\
  / DESCRIPTION
- /   Flush all buffered content.
+ /   Flush buffered content.
 \*/
 static bool vm_flush(ufold_vm_t* vm)
 {
@@ -442,25 +480,32 @@ static bool vm_flush(ufold_vm_t* vm)
 
             vm->state = VM_WRAP;
         } else {
-            if (width > 0 && new_offset < vm->config.max_width) {
-                if (!vm->config.write(vm->line, size)) {
-                    fail();
-                }
-                vm_line_shift(vm, size, width);
-                vm->offset += width;
+            if (vm->offset + vm->line_width <= vm->config.max_width) {
+                if (vm->stopped) {
+                    if (!vm->config.write(vm->line, vm->line_size)) {
+                        fail();
+                    }
+                    vm->offset += vm->line_width;
+                    vm->line_size = 0;
+                    vm->line_width = 0;
 
-                if (vm->state == VM_WRAP) {
-                    vm->state = VM_WORD;
+                    if (vm->state == VM_WRAP) {
+                        vm->state = VM_WORD;
+                    }
+                } else {
+                    // don't break inside an incomplete word
+                    return true;
                 }
             } else {
                 end = NULL;
                 new_offset = vm->offset;
 
-                if (!skip_width(vm->line, size,
+                if (!skip_width(vm->line, vm->line_size,
                                 vm->config.tab_width, vm->config.max_width,
                                 &end, &new_offset)) {
                     fail();
                 }
+                size = end - vm->line;
                 width = new_offset - vm->offset;
 
                 // TODO: don't break ansi escape sequence?
@@ -505,11 +550,13 @@ static bool vm_indent(ufold_vm_t* vm)
         size_t size = indent_end - vm->line;
 
         if (size > 0) {
-            vm->indent = vm->config.realloc(vm->indent, vm->indent_size + size);
+            uint8_t* buf = vm_realloc(vm, vm->indent, vm->indent_size + size);
 
-            if (vm->indent == NULL) {
+            if (buf == NULL) {
                 fail();
             }
+            vm->indent = buf;
+
             memcpy(vm->indent + vm->indent_size, vm->line, size);
             vm->indent_size += size;
             vm->indent_width += width - vm->indent_width;
