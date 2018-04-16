@@ -355,8 +355,8 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 RESIZE:
 #endif
     if (vm->line_size > vm->max_size) {
-        // assume zero-width character is rare
-        size_t max_size = vm->line_size + SLOT_SIZE * 10;
+        // may be looking for the word boundary
+        size_t max_size = vm->line_size * 2;
         // LINE AREA + OVERFLOW AREA
         size_t buf_size = max_size + SLOT_SIZE;
         uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
