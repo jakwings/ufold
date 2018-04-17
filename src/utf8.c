@@ -34,9 +34,8 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
 
         int width = 0;
 
-        // FIXME: recalculate after wrapping
         if (codepoint == '\t') {
-            // TODO: zero-width TAB may not be supported, isatty()?
+            // NOTE: zero-width TAB may not be supported.
             if (tab_width > 1) {
                 width = tab_width - offset % tab_width;
             } else {
