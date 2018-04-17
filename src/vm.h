@@ -61,6 +61,7 @@ bool ufold_vm_stop(ufold_vm_t* vm);
 /*\
  / DESCRIPTION
  /   Flush all buffered output of the VM.
+ /   Flushing an already stopped VM will return false.
  /
  / RETURN
  /    true :: success

@@ -172,7 +172,10 @@ bool ufold_vm_stop(ufold_vm_t* vm)
 
 bool ufold_vm_flush(ufold_vm_t* vm)
 {
-    return vm_flush(vm);
+    if (!vm->stopped) {
+        return vm_flush(vm);
+    }
+    return false;
 }
 
 bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
