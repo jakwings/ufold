@@ -398,9 +398,15 @@ static bool vm_flush(ufold_vm_t* vm)
 #endif
 
     while (vm->line_size > 0) {
-        // may change vm->state
-        if (!vm_indent(vm)) {
-            logged_return(false);
+        if (vm->config.keep_indentation) {
+            // may change vm->state
+            if (!vm_indent(vm)) {
+                logged_return(false);
+            }
+        } else {
+            if (vm->config.max_width == 0) {
+                vm->state = VM_FULL;
+            }
         }
 
         if (vm->state == VM_FULL) {
@@ -496,10 +502,7 @@ static bool vm_flush(ufold_vm_t* vm)
                     vm->offset += vm->line_width;
                     vm->line_size = 0;
                     vm->line_width = 0;
-
-                    if (vm->state == VM_WRAP) {
-                        vm->state = VM_WORD;
-                    }
+                    // keep state
                 } else {
                     // don't break inside an incomplete word
                     return true;
@@ -539,10 +542,6 @@ static bool vm_flush(ufold_vm_t* vm)
 \*/
 static bool vm_indent(ufold_vm_t* vm)
 {
-    if (!vm->config.keep_indentation) {
-        return true;
-    }
-
     // update indent, may update twice if indent is too large
     if (vm->state == VM_LINE) {
         assert(vm->indent_width == vm->offset);
@@ -555,6 +554,8 @@ static bool vm_indent(ufold_vm_t* vm)
                         &indent_end, &width)) {
             logged_return(false);
         }
+        width = width - vm->indent_width;
+
         size_t size = indent_end - vm->line;
 
         if (size > 0) {
@@ -567,7 +568,13 @@ static bool vm_indent(ufold_vm_t* vm)
 
             memcpy(vm->indent + vm->indent_size, vm->line, size);
             vm->indent_size += size;
-            vm->indent_width += width - vm->indent_width;
+            vm->indent_width += width;
+
+            if (!vm->config.write(vm->line, size)) {
+                logged_return(false);
+            }
+            vm->offset += width;
+            vm_line_shift(vm, size, width);
         } else {
             assert(vm->line_size > 0);  // infinite loop otherwise
         }
