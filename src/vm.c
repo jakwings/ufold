@@ -165,7 +165,12 @@ bool ufold_vm_stop(ufold_vm_t* vm)
     if (!vm->stopped) {
         vm->stopped = true;
 
-        logged_return(vm->slot_used == 0 && vm_flush(vm));
+        if (vm->slot_used > 0) {
+            memset(vm->slots, '?', vm->slot_used);
+        }
+        if (!vm_flush(vm) || !vm->config.write(vm->slots, vm->slot_used)) {
+            logged_return(false);
+        }
     }
     return true;
 }
