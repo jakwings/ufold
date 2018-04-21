@@ -123,12 +123,16 @@ bool skip_width(const uint8_t* bytes, size_t size,
         if (width < new_width) {
             logged_return(false);  // TODO: '\b' and the likes, isatty()?
         }
-        if (width > max_width) {
+        if (i > 0 && width > max_width) {
             break;
         }
-        new_width = width;
 
+        new_width = width;
         new_index = bytes + i + n_bytes;
+
+        if (width > max_width) {
+            break;  // skip at least one character when i=0
+        }
     }
 
     *index = new_index;

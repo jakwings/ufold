@@ -50,6 +50,7 @@ bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
 /*\
  / DESCRIPTION
  /   Calculate the index after advancing the pointer by some columns.
+ /   Skip at least one character if the input is valid but not empty.
  /
  / PARAM
  /     tab_width --> maximum tab width (columns)
