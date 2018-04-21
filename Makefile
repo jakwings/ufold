@@ -45,8 +45,11 @@ build/utils.o: src/utils.c src/utils.h src/utf8.h
 utf8proc/libutf8proc.a:
 	${MAKE} -C utf8proc
 
+test: build/ufold
+	./tests/test.sh
+
 clean:
 	${MAKE} -C utf8proc clean
-	rm -rf build/
+	rm -rf build/ tests/tmp_*
 
-.PHONY: all clean ufold
+.PHONY: all clean test ufold
