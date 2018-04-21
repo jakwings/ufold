@@ -29,7 +29,7 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
             break;
         }
         if (n_bytes < 0) {
-            fail();
+            logged_return(false);
         }
 
         int width = 0;
@@ -50,7 +50,7 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
             new_offset += width;
         } else {
             // A TAB or LF right before it can void '\b', what about others?
-            fail();  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);  // TODO: '\b' and the likes, isatty()?
         }
 
         // TODO: \r \v \f

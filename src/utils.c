@@ -71,7 +71,7 @@ bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
             break;
         }
         if (n_bytes < 0) {
-            fail();
+            logged_return(false);
         }
 
         new_index = bytes + i + n_bytes;
@@ -83,7 +83,7 @@ bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
     }
 
     if (!utf8_calc_width(bytes, new_index - bytes, tab_width, line_width)) {
-        fail();
+        logged_return(false);
     }
     *index = new_index;
     *linefeed_found = found;
@@ -112,16 +112,16 @@ bool skip_width(const uint8_t* bytes, size_t size,
             break;
         }
         if (n_bytes < 0) {
-            fail();
+            logged_return(false);
         }
 
         size_t width = new_width;
 
         if (!utf8_calc_width(new_index, n_bytes, tab_width, &width)) {
-            fail();
+            logged_return(false);
         }
         if (width < new_width) {
-            fail();  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);  // TODO: '\b' and the likes, isatty()?
         }
         if (width > max_width) {
             break;
@@ -151,7 +151,7 @@ bool skip_space(const uint8_t* bytes, size_t size, size_t tab_width,
             break;
         }
         if (n_bytes < 0) {
-            fail();
+            logged_return(false);
         }
 
         if (!is_whitespace(codepoint)) {
@@ -162,7 +162,7 @@ bool skip_space(const uint8_t* bytes, size_t size, size_t tab_width,
     }
 
     if (!utf8_calc_width(bytes, new_index - bytes, tab_width, line_width)) {
-        fail();
+        logged_return(false);
     }
     *index = new_index;
     return true;
@@ -193,7 +193,7 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
             break;
         }
         if (n_bytes < 0) {
-            fail();
+            logged_return(false);
         }
 
         if (with_space) {
@@ -212,10 +212,10 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
         next_width = new_width;
 
         if (!utf8_calc_width(new_index, n_bytes, tab_width, &next_width)) {
-            fail();
+            logged_return(false);
         }
         if (next_width < new_width) {
-            fail();  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);  // TODO: '\b' and the likes, isatty()?
         }
         if (!with_space) {
             if (next_width > max_width) {

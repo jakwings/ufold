@@ -8,12 +8,18 @@
 
 #ifndef NDEBUG
 #include <stdio.h>
-#define fail() \
-    fprintf(stderr, "[FAILURE] from file \"%s\" line %d: %s()\n", \
+
+#define log(fmt, ...) \
+    fprintf(stderr, (fmt), __VA_ARGS__)
+
+#define logged_return(yes) \
+    if (yes) fprintf(stderr, "[FAILURE] from file \"%s\" line %d: %s()\n", \
             __FILE__, __LINE__, __func__); \
-    return false;
+    return (yes)
+
 #else
-#define fail() return false
+#define log(fmt, ...)
+#define logged_return(yes) return (yes)
 #endif
 
 bool is_controlchar(utf8proc_int32_t codepoint);

@@ -301,15 +301,30 @@ int main(int argc, char** argv)
     FILE* stream = stdin;
     ufold_vm_t* vm = ufold_vm_new(config);
 
-    if (vm == NULL) goto FAIL;
+    if (vm == NULL) {
+        warn("%s", "failed to create vm");
+        goto FAIL;
+    }
 
     if (argc > 0) {
         for (int i = 0; i < argc; i++) {
-            if ((stream = fopen(argv[i], "rb")) == NULL) goto FAIL;
-            if (!wrap_input(vm, stream)) goto FAIL;
-            if (fclose(stream) != 0) goto FAIL;
+            if ((stream = fopen(argv[i], "rb")) == NULL) {
+                warn("failed to open \"%s\"", argv[i]);
+                goto FAIL;
+            }
+            if (!wrap_input(vm, stream)) {
+                warn("failed to process \"%s\"", argv[i]);
+                goto FAIL;
+            }
+            if (fclose(stream) != 0) {
+                warn("failed to close \"%s\"", argv[i]);
+                goto FAIL;
+            }
         }
-    } else if (!wrap_input(vm, stream)) goto FAIL;
+    } else if (!wrap_input(vm, stream)) {
+        warn("%s", "failed to process stdin");
+        goto FAIL;
+    }
 
     if (ferror(stream)) {
 FAIL:
@@ -325,6 +340,7 @@ FAIL:
 
     // flush all output
     if (!ufold_vm_stop(vm)) {
+        warn("%s", "failed to stop vm");
         goto FAIL;
     }
     ufold_vm_free(vm);

@@ -165,7 +165,7 @@ bool ufold_vm_stop(ufold_vm_t* vm)
     if (!vm->stopped) {
         vm->stopped = true;
 
-        return vm->slot_used == 0 && vm_flush(vm);
+        logged_return(vm->slot_used == 0 && vm_flush(vm));
     }
     return true;
 }
@@ -173,15 +173,15 @@ bool ufold_vm_stop(ufold_vm_t* vm)
 bool ufold_vm_flush(ufold_vm_t* vm)
 {
     if (!vm->stopped) {
-        return vm_flush(vm);
+        logged_return(vm_flush(vm));
     }
-    return false;
+    logged_return(false);
 }
 
 bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 {
     if (vm->stopped) {
-        fail();
+        logged_return(false);
     }
 
     for (size_t i = 0; i < size; i++) {
@@ -197,7 +197,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 
             if (n > 0 && !vm_feed(vm, output, n)) {
                 vm->stopped = true;
-                fail();
+                logged_return(false);
             }
         } while (n > 0);
     }
@@ -307,7 +307,7 @@ static bool vm_line_update_width(ufold_vm_t* vm)
 
     if (!utf8_calc_width(vm->line, vm->line_size, vm->config.tab_width,
                          &width)) {
-        fail();
+        logged_return(false);
     }
     vm->line_width = width - vm->offset;
     return true;
@@ -337,7 +337,7 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     size_t width = vm->offset + vm->line_width;
 
     if (!utf8_calc_width(bytes, size, vm->config.tab_width, &width)) {
-        fail();
+        logged_return(false);
     }
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
@@ -365,7 +365,7 @@ RESIZE:
         uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
 
         if (buf == NULL) {
-            fail();
+            logged_return(false);
         }
         vm->line = buf;
         vm->max_size = max_size;
@@ -385,7 +385,7 @@ static bool vm_flush(ufold_vm_t* vm)
     if (vm->config.max_width == 0) {
         // write sanitized input
         if (vm->line_size > 0 && !vm->config.write(vm->line, vm->line_size)) {
-            fail();
+            logged_return(false);
         }
         vm->line_size = 0;
         return true;
@@ -395,7 +395,7 @@ static bool vm_flush(ufold_vm_t* vm)
     while (vm->line_size > 0) {
         // may change vm->state
         if (!vm_indent(vm)) {
-            fail();
+            logged_return(false);
         }
 
         if (vm->state == VM_FULL) {
@@ -405,13 +405,13 @@ static bool vm_flush(ufold_vm_t* vm)
 
             if (!find_eol(vm->line, vm->line_size, vm->config.tab_width,
                           &end, &new_offset, &found)) {
-                fail();
+                logged_return(false);
             }
             size_t size = end - vm->line;
             size_t width = new_offset - vm->offset;
 
             if (!vm->config.write(vm->line, size)) {
-                fail();
+                logged_return(false);
             }
 
             if (found) {
@@ -437,7 +437,7 @@ static bool vm_flush(ufold_vm_t* vm)
         if (!break_line(vm->line, vm->line_size, vm->config.break_at_spaces,
                         vm->config.tab_width, vm->config.max_width,
                         &word_end, &linefeed, &end, &new_offset)) {
-            fail();
+            logged_return(false);
         }
         assert(new_offset >= vm->offset);
 
@@ -448,7 +448,7 @@ static bool vm_flush(ufold_vm_t* vm)
             assert(new_offset <= vm->config.max_width);
 
             if (!vm->config.write(vm->line, size)) {
-                fail();
+                logged_return(false);
             }
 #ifdef NDEBUG
             if (end - vm->line == vm->line_size) {
@@ -474,7 +474,7 @@ static bool vm_flush(ufold_vm_t* vm)
 
             if (!vm->config.write(vm->line, size) ||
                     !vm->config.write("\n", 1)) {
-                fail();
+                logged_return(false);
             }
             vm_line_shift(vm, size, width);
             vm->offset = vm->indent_width;
@@ -486,7 +486,7 @@ static bool vm_flush(ufold_vm_t* vm)
             if (vm->offset + vm->line_width <= vm->config.max_width) {
                 if (vm->stopped) {
                     if (!vm->config.write(vm->line, vm->line_size)) {
-                        fail();
+                        logged_return(false);
                     }
                     vm->offset += vm->line_width;
                     vm->line_size = 0;
@@ -506,7 +506,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 if (!skip_width(vm->line, vm->line_size,
                                 vm->config.tab_width, vm->config.max_width,
                                 &end, &new_offset)) {
-                    fail();
+                    logged_return(false);
                 }
                 size = end - vm->line;
                 width = new_offset - vm->offset;
@@ -514,7 +514,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 // TODO: don't break ansi escape sequence?
                 if (!vm->config.write(vm->line, size) ||
                         !vm->config.write("\n", 1)) {
-                    fail();
+                    logged_return(false);
                 }
                 vm_line_shift(vm, size, width);
                 vm->offset = vm->indent_width;
@@ -548,7 +548,7 @@ static bool vm_indent(ufold_vm_t* vm)
 
         if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
                         &indent_end, &width)) {
-            fail();
+            logged_return(false);
         }
         size_t size = indent_end - vm->line;
 
@@ -556,7 +556,7 @@ static bool vm_indent(ufold_vm_t* vm)
             uint8_t* buf = vm_realloc(vm, vm->indent, vm->indent_size + size);
 
             if (buf == NULL) {
-                fail();
+                logged_return(false);
             }
             vm->indent = buf;
 
@@ -580,7 +580,7 @@ static bool vm_indent(ufold_vm_t* vm)
             assert(vm->indent != NULL);
 
             if (!vm->config.write(vm->indent, vm->indent_size)) {
-                fail();
+                logged_return(false);
             }
         }
     }
