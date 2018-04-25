@@ -51,16 +51,16 @@ ______________________________________________________________________________
          --
                 All arguments after two dashes are not treated as options.
 
-         The program will concatenate all files' content as if there is only
-         a single source of input, i.e these two bash commands are equivalent:
+         The program will concatenate all files' content as if there is only a
+          single source of input, i.e these two bash commands are equivalent:
                 ufold file1 file2 ;
                 cat file1 file2 | ufold ;
 
          More to note:
-                When the indent occupies no less columns than the maximum,
+                When a line indent occupies no less columns than the maximum,
                 the corresponding line will not be wrapped but kept as is.
 
-                When the flag --spaces (-s) is given and a fragment
+                When the flag --spaces (-s) is given and a text fragment
                 containing no spaces exceeds the maximum width, the program
                 will still insert a hard break inside the text.
 
