@@ -4,10 +4,16 @@ ufold=../build/ufold
 loop=100
 seconds=5
 
+if [[ ! -x "${ufold}" ]]; then
+    ufold=$(type -p ufold)
+    if [[ "$?" -ne 0 ]]; then
+        echo 'ufold not found'
+        exit 1
+    fi
+fi
+
 function fold {
-    head -c10000 /dev/random |
-        tee tmp_stdin |
-            timeout "${seconds}" "${ufold}" "$@"
+    timeout "${seconds}" "${ufold}" "$@"
 }
 
 cd "$(dirname -- "$0")"
@@ -30,7 +36,10 @@ while [[ $i -lt ${#flags[@]} ]]; do
     j=1
     while [[ $j -le "${loop}" ]]; do
         printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" $j
-        fold $args > tmp_stdout 2> tmp_stderr
+
+        head -c10000 /dev/random |
+            tee tmp_stdin |
+                fold $args > tmp_stdout 2> tmp_stderr
 
         exitcode=$?
         if [[ "${exitcode}" -ne 0 ]]; then
