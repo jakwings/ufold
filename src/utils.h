@@ -12,10 +12,10 @@
 #define log(fmt, ...) \
     fprintf(stderr, (fmt), __VA_ARGS__)
 
-#define logged_return(yes) \
-    if (yes) fprintf(stderr, "[FAILURE] from file \"%s\" line %d: %s()\n", \
+#define logged_return(ok) \
+    if (!ok) fprintf(stderr, "[FAILURE] from file \"%s\" line %d: %s()\n", \
             __FILE__, __LINE__, __func__); \
-    return (yes)
+    return (ok)
 
 #else
 #define log(fmt, ...)
