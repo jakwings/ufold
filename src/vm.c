@@ -495,19 +495,23 @@ static bool vm_flush(ufold_vm_t* vm)
             vm->state = VM_WRAP;
         } else {
             if (vm->offset + vm->line_width <= vm->config.max_width) {
-                if (vm->stopped) {
+                if (!vm->stopped &&
+                        vm->offset + vm->line_width == vm->config.max_width) {
+                    // START->|indent word word ... word|<-MAX
+                    // don't break inside a possibly incomplete word
+                    return true;
+                }
+                if (vm->line_size > 0) {
                     if (!vm->config.write(vm->line, vm->line_size)) {
                         logged_return(false);
                     }
                     vm->offset += vm->line_width;
                     vm->line_size = 0;
                     vm->line_width = 0;
-                    // keep state
-                } else {
-                    // don't break inside a possibly incomplete word
-                    return true;
+
+                    vm->state = VM_WORD;
                 }
-            } else {
+            } else if (vm->offset + vm->line_width > vm->config.max_width) {
                 end = NULL;
                 new_offset = vm->offset;
 
@@ -518,8 +522,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 }
                 size = end - vm->line;
                 width = new_offset - vm->offset;
-                // especially for --width=1
-                assert(size > 0);
+                assert(size > 0 && width > 0);
 
                 // TODO: don't break ansi escape sequence?
                 if (!vm->config.write(vm->line, size) ||
