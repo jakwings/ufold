@@ -504,7 +504,7 @@ static bool vm_flush(ufold_vm_t* vm)
                     vm->line_width = 0;
                     // keep state
                 } else {
-                    // don't break inside an incomplete word
+                    // don't break inside a possibly incomplete word
                     return true;
                 }
             } else {
@@ -518,6 +518,8 @@ static bool vm_flush(ufold_vm_t* vm)
                 }
                 size = end - vm->line;
                 width = new_offset - vm->offset;
+                // especially for --width=1
+                assert(size > 0);
 
                 // TODO: don't break ansi escape sequence?
                 if (!vm->config.write(vm->line, size) ||
