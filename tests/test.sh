@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+cd "$(dirname -- "$0")"
+
 ufold=../build/ufold
 loop=100
 seconds=5
@@ -7,16 +9,29 @@ seconds=5
 if [[ ! -x "${ufold}" ]]; then
     ufold=$(type -p ufold)
     if [[ "$?" -ne 0 ]]; then
-        echo 'ufold not found'
+        printf 'ufold not found\n'
         exit 1
     fi
 fi
+printf 'Using ufold: %s\n' "${ufold}"
 
 function fold {
     timeout "${seconds}" "${ufold}" "$@"
 }
 
-cd "$(dirname -- "$0")"
+if [[ -r tmp_flags ]]; then
+    printf 'Retry the previous failed test: ufold %s ... ' "$(cat tmp_flags)"
+    fold $(cat tmp_flags) < tmp_stdin > tmp_stdout 2> tmp_stderr
+
+    exitcode=$?
+    if [[ "${exitcode}" -ne 0 ]]; then
+        printf 'Failed\n'
+        wc -c tmp_std{in,out}
+        cat tmp_stderr
+        exit "${exitcode}"
+    fi
+    printf 'Done\n'
+fi
 
 # test exit status
 flags=(
@@ -32,6 +47,7 @@ flags=(
 i=0
 while [[ $i -lt ${#flags[@]} ]]; do
     args=${flags[$i]}
+    printf '%s\n' "${args}" > tmp_flags
 
     j=1
     while [[ $j -le "${loop}" ]]; do
@@ -55,4 +71,4 @@ while [[ $i -lt ${#flags[@]} ]]; do
 
     i=$(( i + 1 ))
 done
-rm tmp_std{in,out,err}
+rm tmp_flags tmp_std{in,out,err}
