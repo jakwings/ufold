@@ -1,0 +1,32 @@
+
+-w80 -t8
+-w80 -t8
+-w0 -t8
+-w1 -t8
+-w20 -t8
+-w8 -t8
+-w1 -t8
+-w1 -t1
+-w1 -t0
+-w80 -t8
+-b -w80 -t8
+-s -w80 -t8
+-s -w80 -t8
+-s -w32 -t8
+-s -w0 -t8
+-s -w1 -t8
+-s -w1 -t8
+-s -w1 -t0
+-i -w80 -t8
+-i -w32 -t8
+-i -w4 -t8
+-i -w0 -t8
+-is -w32 -t8
+-is -w4 -t8
+-is -w0 -t8
+-i -w8 -t8
+-i -w7 -t8
+-i -w7 -t0
+-is -w8 -t8
+-is -w7 -t8
+-is -w7 -t0
