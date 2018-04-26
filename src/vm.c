@@ -495,23 +495,20 @@ static bool vm_flush(ufold_vm_t* vm)
             vm->state = VM_WRAP;
         } else {
             if (vm->offset + vm->line_width <= vm->config.max_width) {
-                if (!vm->stopped &&
-                        vm->offset + vm->line_width == vm->config.max_width) {
-                    // START->|indent word word ... word|<-MAX
-                    // don't break inside a possibly incomplete word
-                    return true;
-                }
-                if (vm->line_size > 0) {
+                if (vm->stopped) {
                     if (!vm->config.write(vm->line, vm->line_size)) {
                         logged_return(false);
                     }
                     vm->offset += vm->line_width;
                     vm->line_size = 0;
                     vm->line_width = 0;
-
-                    vm->state = VM_WORD;
                 }
-            } else if (vm->offset + vm->line_width > vm->config.max_width) {
+                vm->state = VM_WORD;
+
+                // START->|indent word word ... word|<-MAX
+                // don't break inside a possibly incomplete word
+                return true;
+            } else {
                 end = NULL;
                 new_offset = vm->offset;
 
