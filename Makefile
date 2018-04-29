@@ -13,7 +13,7 @@ override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
 ifndef DEBUG
     override CFLAGS += -O2 -DNDEBUG
 else
-    override CFLAGS += -O0 -g -fsanitize=address -fno-omit-frame-pointer
+    override CFLAGS += -O0 -g
 endif
 
 all: ufold build/ufold.a build/ufold.h
