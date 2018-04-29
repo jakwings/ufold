@@ -4,6 +4,7 @@ TAB_WIDTH := 8
 OBJECTS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 OBJECTS += build/ufold build/ufold.a build/ufold.h
 OBJECTS += utf8proc/libutf8proc.a
+OBJECTS += build/test
 
 unexport CFLAGS
 override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
@@ -12,7 +13,7 @@ override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
 ifndef DEBUG
     override CFLAGS += -O2 -DNDEBUG
 else
-    override CFLAGS += -O0 -g
+    override CFLAGS += -O0 -g -fsanitize=address -fno-omit-frame-pointer
 endif
 
 all: ufold build/ufold.a build/ufold.h
@@ -42,10 +43,16 @@ build/utf8.o: src/utf8.c src/utf8.h src/utils.h
 build/utils.o: src/utils.c src/utils.h src/utf8.h
 	${CC} ${CFLAGS} -c -o $@ $<
 
+build/test: tests/test.c build/ufold.a build/ufold.h
+	${CC} ${CFLAGS} -UNDEBUG -O0 -g \
+	    -fsanitize=address -fno-omit-frame-pointer \
+	    -Ibuild/ -o $@ tests/test.c build/ufold.a
+
 utf8proc/libutf8proc.a:
 	${MAKE} -C utf8proc
 
-test:
+test: build/test
+	timeout 5 ./build/test
 	./tests/test.sh
 
 clean:
