@@ -154,10 +154,12 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
 
 void ufold_vm_free(ufold_vm_t* vm)
 {
-    vm_free(vm, vm->line);
-    vm_free(vm, vm->slots);
-    vm_free(vm, vm->indent);
-    vm_free(vm, vm);
+    if (vm != NULL) {
+        vm_free(vm, vm->line);
+        vm_free(vm, vm->slots);
+        vm_free(vm, vm->indent);
+        vm_free(vm, vm);
+    }
 }
 
 bool ufold_vm_stop(ufold_vm_t* vm)
