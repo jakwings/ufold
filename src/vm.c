@@ -326,8 +326,6 @@ static bool vm_line_update_width(ufold_vm_t* vm)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
-    bool done = true;
-
 #ifdef NDEBUG
     // inharmonious logic
     if (vm->config.max_width == 0) {
@@ -335,7 +333,9 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
         vm->line_size += size;
 
         if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-            done = vm_flush(vm);
+            if (!vm_flush(vm)) {
+                logged_return(false);
+            }
         }
         goto RESIZE;
     }
@@ -350,16 +350,11 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     vm->line_size += size;
     vm->line_width += width - vm->offset - vm->line_width;
 
-#ifdef NDEBUG
     if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        done = vm_flush(vm);
+        if (!vm_flush(vm)) {
+            logged_return(false);
+        }
     }
-#else
-    if (vm->line_width >= vm->config.max_width ||
-            vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-        done = vm_flush(vm);
-    }
-#endif
 
 #ifdef NDEBUG
 RESIZE:
@@ -378,7 +373,7 @@ RESIZE:
         vm->max_size = max_size;
     }
 
-    return done;
+    return true;
 }
 
 /*\
