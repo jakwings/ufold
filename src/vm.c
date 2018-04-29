@@ -405,11 +405,16 @@ static bool vm_flush(ufold_vm_t* vm)
             if (!vm_indent(vm)) {
                 logged_return(false);
             }
+            if (vm->line_size == 0) {
+                assert(vm->state == VM_LINE || vm->state == VM_FULL);
+                return true;
+            }
         } else {
             if (vm->config.max_width == 0) {
                 vm->state = VM_FULL;
             }
         }
+        assert(vm->line_size > 0);
 
         if (vm->state == VM_FULL) {
             const uint8_t* end = NULL;
