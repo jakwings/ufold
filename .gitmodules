@@ -2,3 +2,7 @@
 	path = utf8proc
 	url = https://github.com/JuliaLang/utf8proc.git
 	ignore = dirty
+[submodule "pcg-c"]
+	path = pcg-c
+	url = https://github.com/imneme/pcg-c.git
+	ignore = dirty
