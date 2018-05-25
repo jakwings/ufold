@@ -1,0 +1,4 @@
+language: cpp
+
+script:
+  - make DEBUG=1 CHECK_LEAK=1 clean all test
