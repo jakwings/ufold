@@ -3,8 +3,8 @@ TAB_WIDTH := 8
 
 OBJECTS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 OBJECTS += build/ufold build/ufold.a build/ufold.h
-OBJECTS += utf8proc/libutf8proc.a
-OBJECTS += build/test
+OBJECTS += utf8proc/libutf8proc.a pcg-c/src/libpcg_random.a
+OBJECTS += build/test build/urandom
 
 unexport CFLAGS
 override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
@@ -14,6 +14,19 @@ ifndef DEBUG
     override CFLAGS += -O2 -DNDEBUG
 else
     override CFLAGS += -O0 -g
+endif
+
+ifdef CHECK_LEAK
+    override CFLAGS += -fsanitize=address -fno-omit-frame-pointer
+endif
+
+OS := $(shell uname)
+
+ifeq ($(OS),Darwin)
+    MAKELIB := libtool -static -o
+else
+    override CFLAGS := ${CFLAGS} -D_GNU_SOURCE -D_XOPEN_SOURCE=700
+    MAKELIB := ./makelib.sh
 endif
 
 all: ufold build/ufold.a build/ufold.h
@@ -28,11 +41,11 @@ build/:
 build/ufold: src/main.c build/ufold.a
 	${CC} ${CFLAGS} -o $@ $^
 
-build/ufold.a: build/vm.o build/utf8.o build/utils.o utf8proc/libutf8proc.a
-	libtool -static -o $@ - $^
-
 build/ufold.h: src/vm.h
 	cp src/vm.h build/ufold.h
+
+build/ufold.a: build/vm.o build/utf8.o build/utils.o utf8proc/libutf8proc.a
+	${MAKELIB} $@ $^
 
 build/vm.o: src/vm.c src/vm.h src/utf8.h src/utils.h
 	${CC} ${CFLAGS} -c -o $@ $<
@@ -44,19 +57,24 @@ build/utils.o: src/utils.c src/utils.h src/utf8.h
 	${CC} ${CFLAGS} -c -o $@ $<
 
 build/test: tests/test.c build/ufold.a build/ufold.h
-	${CC} ${CFLAGS} -UNDEBUG -O0 -g \
-	    -fsanitize=address -fno-omit-frame-pointer \
-	    -Ibuild/ -o $@ tests/test.c build/ufold.a
+	${CC} ${CFLAGS} -UNDEBUG -Ibuild/ -o $@ tests/test.c build/ufold.a
+
+build/urandom: tests/urandom.c pcg-c/src/libpcg_random.a
+	${CC} -std=c99 -Wall -pedantic -O3 -Ipcg-c/include -o $@ $^
 
 utf8proc/libutf8proc.a:
-	${MAKE} -C utf8proc
+	${MAKE} -C utf8proc UTF8PROC_DEFINES=-DUTF8PROC_STATIC
 
-test: build/test
+pcg-c/src/libpcg_random.a:
+	${MAKE} -C pcg-c
+
+test: build/test build/urandom
 	timeout 5 ./build/test
-	./tests/test.sh
+	./tests/test.sh ${SEED}
 
 clean:
 	${MAKE} -C utf8proc clean
+	${MAKE} -C pcg-c clean
 	rm -rf build/ tests/tmp_*
 
 .PHONY: all clean test ufold

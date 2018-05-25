@@ -3,8 +3,12 @@
 cd "$(dirname -- "$0")"
 
 ufold=../build/ufold
-loop=100
+urandom=../build/urandom
+loop=42
 seconds=5
+seed=${1:-"$(date +%s)"}
+
+printf '[SEED=%s]\n\n' "${seed}"
 
 if [[ ! -x "${ufold}" ]]; then
     ufold=$(type -p ufold)
@@ -76,6 +80,8 @@ flags=(
     -{b,s,i,bs,bi,is,bis}\ -t{8..0}
     -{b,s,i,bs,bi,is,bis}\ -w{8..0}\ -t{8..0}
 )
+read_total=0
+read_delta=10086
 i=0
 while [[ $i -lt ${#flags[@]} ]]; do
     args=${flags[$i]}
@@ -85,11 +91,12 @@ while [[ $i -lt ${#flags[@]} ]]; do
     while [[ $j -le "${loop}" ]]; do
         printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" $j
 
-        head -c10000 /dev/random |
+        "${urandom}" "${seed}" "${read_total}" | head -c"${read_delta}" |
             tee tmp_stdin |
                 fold $args > tmp_stdout 2> tmp_stderr
         exit_if_failed
 
+        read_total=$(( read_total + read_delta ))
         j=$(( j + 1 ))
     done
     printf 'Done\n'
