@@ -96,7 +96,7 @@ static const char* const manual =
 
 static const char* const usage =
 "USAGE\n"
-"    ufold [option]... [file]...\n"
+"    " P " [option]... [file]...\n"
 "\n"
 "    Wrap input lines from files and write to standard output.\n"
 "    When no file is specified, read from standard input.\n"
@@ -330,6 +330,7 @@ int main(int argc, char** argv)
 FAIL:
         if (errno != 0) {
             perror(NULL);
+            errno = 0;
         } else {
             warn("unknown error, please report bugs to %s", ISSUES);
         }
