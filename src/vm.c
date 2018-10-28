@@ -114,6 +114,9 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
         // TODO: inform error type?
         return NULL;
     }
+    vm->config = config;
+    vm->line = NULL;
+    vm->indent = NULL;
 
     assert(MAX_WIDTH >= 0);
 
@@ -142,7 +145,6 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
 
     vm->config = config;
     vm->slot_used = 0;
-    vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
     vm->offset = 0;
