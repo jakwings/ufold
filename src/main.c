@@ -155,7 +155,7 @@ static bool parse_integer(const char* str, size_t* num)
 
         if ((n > 0 && SIZE_MAX / n < 10) || n * 10 + k < n) {
             n = SIZE_MAX;
-            break;
+            continue;
         }
         n = n * 10 + k;
     }

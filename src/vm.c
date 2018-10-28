@@ -345,10 +345,14 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     if (vm->line_size > vm->max_size) {
         // may be looking for the word boundary
         size_t max_size = vm->line_size + SLOT_SIZE;
+        // check overflow
+        if (max_size < vm->line_size) {
+            logged_return(false);
+        }
         // LINE AREA + OVERFLOW AREA
         size_t buf_size = max_size + SLOT_SIZE;
         // check overflow
-        if (max_size < vm->line_size || buf_size < max_size) {
+        if (buf_size < max_size) {
             logged_return(false);
         }
         uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
@@ -557,6 +561,11 @@ static bool vm_indent(ufold_vm_t* vm)
         size_t size = indent_end - vm->line;
 
         if (size > 0) {
+            size_t buf_size = vm->indent_size + size;
+            // check overflow
+            if (buf_size < vm->indent_size) {
+                logged_return(false);
+            }
             uint8_t* buf = vm_realloc(vm, vm->indent, vm->indent_size + size);
 
             if (buf == NULL) {
