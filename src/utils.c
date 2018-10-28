@@ -30,7 +30,6 @@ bool is_linefeed(utf8proc_int32_t codepoint)
                    codepoint == '\f' ||  // TODO: indent with '\f'?
                    // TODO: need browser&terminal support, isatty()?
                    utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZL));
-    // NOTE: And what about ANSI escape codes?
 }
 
 bool has_linefeed(const uint8_t* bytes, size_t size)

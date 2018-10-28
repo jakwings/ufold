@@ -10,10 +10,10 @@
 
 //\ I/O State of VM
 typedef enum vm_state {
-    VM_WORD,
-    VM_LINE,
-    VM_WRAP,
-    VM_FULL,
+    VM_WORD,  // processing a fragment
+    VM_LINE,  // processing a new line
+    VM_WRAP,  // processing a new wrapped line
+    VM_FULL,  // maximum line width exceeded
 } vm_state_t;
 
 //\ Virtual State Machine
@@ -30,7 +30,7 @@ struct ufold_vm_struct {
     size_t indent_width;
     size_t offset;  // (width) if buffer start is not at line start
     size_t line_size;
-    size_t line_width;
+    size_t line_width;  // only updated when needed (in order to save time)
     // Switches
     vm_state_t state;
     bool stopped;
@@ -197,6 +197,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
     if (vm->stopped) {
         logged_return(false);
     }
+    // TODO: provide a fast path for ASCII mode
 
     for (size_t i = 0; i < size; i++) {
         const uint8_t* input = (const uint8_t*)bytes + i;
@@ -206,6 +207,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
             static uint8_t output[SLOT_SIZE];
 
             n = vm_slot(vm, input, output);
+            // TODO: new option for interpreting ANSI color codes
             n = utf8_sanitize(output, n, vm->config.truncate_bytes);
             input = NULL;
 

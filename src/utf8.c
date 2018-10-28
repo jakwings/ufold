@@ -62,7 +62,6 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
     return true;
 }
 
-// TODO: deal with surrogate?
 size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
 {
     utf8proc_int32_t codepoint = -1;
@@ -75,6 +74,7 @@ size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
             continue;
         }
 
+        // NOTE: surrogates are invalid
         n_bytes = utf8proc_iterate(bytes + i, size - i, &codepoint);
 
         if (n_bytes == 0) {
