@@ -12,7 +12,7 @@ size_t utf8_valid_length(uint8_t byte)
     return lengths[byte >> 3];
 }
 
-// TODO: deal with surrogate? grapheme cluster?
+// TODO: grapheme cluster?
 bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
                      size_t* line_offset)
 {
