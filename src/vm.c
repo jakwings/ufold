@@ -282,7 +282,9 @@ static void vm_slot_shift(ufold_vm_t* vm, size_t n)
 {
     assert(vm->slot_used >= n);
 
-    if (vm->slot_used >= n) {
+    if (vm->slot_used <= n) {
+        vm->slot_used = 0;
+    } else {
         memmove(vm->slots, vm->slots + n, vm->slot_used - n);
         vm->slot_used -= n;
     }
@@ -296,7 +298,10 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 {
     assert(vm->line_size >= size && vm->line_width >= width);
 
-    if (vm->line_size >= size && vm->line_width >= width) {
+    if (vm->line_size <= size || vm->line_width < width) {
+        vm->line_size = 0;
+        vm->line_width = 0;
+    } else {
         memmove(vm->line, vm->line + size, vm->line_size - size);
         vm->line_size -= size;
         vm->line_width -= width;
