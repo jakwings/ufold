@@ -145,12 +145,19 @@ static bool parse_integer(const char* str, size_t* num)
         return false;
     }
     size_t n = 0;
+    size_t k = 0;
 
     for (const char* p = str; *p != '\0'; p++) {
         if (!('0' <= *p && *p <= '9')) {
             return false;
         }
-        n = n * 10 + (*p - '0');  // overflow?
+        k = *p - '0';
+
+        if ((n > 0 && SIZE_MAX / n < 10) || n * 10 + k < n) {
+            n = SIZE_MAX;
+            break;
+        }
+        n = n * 10 + k;
     }
     *num = n;
 

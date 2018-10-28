@@ -111,6 +111,7 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     ufold_vm_t* vm = config.realloc(NULL, sizeof(ufold_vm_t));
 
     if (vm == NULL) {
+        // TODO: inform error type?
         return NULL;
     }
 
@@ -119,7 +120,17 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     // |<------------- LINE AREA ------------->|< EXTRA >|
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
     size_t width = (config.max_width > 0) ? config.max_width : MAX_WIDTH;
+    // check overflow
+    if (sizeof(uint32_t) > 0 && SIZE_MAX / width < sizeof(uint32_t)) {
+        vm_free(vm, vm);
+        return NULL;
+    }
     size_t size = sizeof(uint32_t) * width + SLOT_SIZE;
+    // check overflow
+    if (size < sizeof(uint32_t) * width) {
+        vm_free(vm, vm);
+        return NULL;
+    }
 
     vm->line = config.realloc(NULL, size);
 
@@ -317,7 +328,8 @@ static bool vm_line_update_width(ufold_vm_t* vm)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
-    assert(vm->line_size + size <= vm->max_size + SLOT_SIZE);
+    assert(vm->line_size <= vm->max_size);
+    assert(size <= SLOT_SIZE);
 
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
@@ -330,9 +342,13 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 
     if (vm->line_size > vm->max_size) {
         // may be looking for the word boundary
-        size_t max_size = vm->line_size * 2;
+        size_t max_size = vm->line_size + SLOT_SIZE;
         // LINE AREA + OVERFLOW AREA
         size_t buf_size = max_size + SLOT_SIZE;
+        // check overflow
+        if (max_size < vm->line_size || buf_size < max_size) {
+            logged_return(false);
+        }
         uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
 
         if (buf == NULL) {
