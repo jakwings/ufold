@@ -115,8 +115,6 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
         return NULL;
     }
     vm->config = config;
-    vm->line = NULL;
-    vm->indent = NULL;
 
     assert(MAX_WIDTH >= 0);
 
@@ -143,8 +141,8 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     }
     vm->max_size = size - SLOT_SIZE;
 
-    vm->config = config;
     vm->slot_used = 0;
+    vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
     vm->offset = 0;
@@ -206,7 +204,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
         size_t n = 0;
 
         do {
-            static uint8_t output[SLOT_SIZE];
+            uint8_t output[SLOT_SIZE];
 
             n = vm_slot(vm, input, output);
             // TODO: new option for interpreting ANSI color codes
