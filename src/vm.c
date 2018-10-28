@@ -6,7 +6,7 @@
 #include "utils.h"
 #include "vm.h"
 
-#define SLOT_SIZE 4
+#define SLOT_SIZE 4  // maximum length of a Unicode scalar in bytes
 
 //\ I/O State of VM
 typedef enum vm_state {
@@ -23,7 +23,7 @@ struct ufold_vm_struct {
     // Accumulation
     uint8_t* line;
     size_t max_size;  // capacity of line buffer (excluding extra area)
-    uint8_t* slots;
+    uint8_t slots[SLOT_SIZE];
     size_t slot_used;
     uint8_t* indent;
     size_t indent_size;
@@ -114,7 +114,6 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
         return NULL;
     }
 
-    assert(SLOT_SIZE >= sizeof(uint32_t));
     assert(MAX_WIDTH >= 0);
 
     // |<------------- LINE AREA ------------->|< EXTRA >|
@@ -130,16 +129,8 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     }
     vm->max_size = size - SLOT_SIZE;
 
-    vm->slots = config.realloc(NULL, SLOT_SIZE);
-
-    if (vm->slots == NULL) {
-        vm_free(vm, vm->line);
-        vm_free(vm, vm);
-        return NULL;
-    }
-    vm->slot_used = 0;
-
     vm->config = config;
+    vm->slot_used = 0;
     vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
@@ -156,7 +147,6 @@ void ufold_vm_free(ufold_vm_t* vm)
 {
     if (vm != NULL) {
         vm_free(vm, vm->line);
-        vm_free(vm, vm->slots);
         vm_free(vm, vm->indent);
         vm_free(vm, vm);
     }
@@ -168,9 +158,15 @@ bool ufold_vm_stop(ufold_vm_t* vm)
         vm->stopped = true;
 
         if (vm->slot_used > 0) {
-            memset(vm->slots, '?', vm->slot_used);
+            vm->slot_used = utf8_sanitize(vm->slots, vm->slot_used,
+                                          vm->config.truncate_bytes);
+
+            if (!vm_feed(vm, vm->slots, vm->slot_used)) {
+                logged_return(false);
+            }
+            vm->slot_used = 0;
         }
-        if (!vm_flush(vm) || !vm->config.write(vm->slots, vm->slot_used)) {
+        if (!vm_flush(vm)) {
             logged_return(false);
         }
     }
@@ -196,7 +192,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
         size_t n = 0;
 
         do {
-            uint8_t output[SLOT_SIZE] = {0};
+            static uint8_t output[SLOT_SIZE];
 
             n = vm_slot(vm, input, output);
             n = utf8_sanitize(output, n, vm->config.truncate_bytes);
@@ -214,7 +210,8 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 
 /*\
  / DESCRIPTION
- /   Push a byte into the available slots and pop a valid UTF-8 byte sequence.
+ /   Push a byte into the available slots and pop a useful byte sequence.
+ /   A potentially well-formed UTF-8 byte sequence is not useful yet.
  /
  / PARAMETERS
  /    *byte --> optional input
@@ -238,37 +235,19 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
         return 0;
     }
 
-    const uint8_t* taint = utf8_validate(vm->slots, n);
-
-    if (taint != NULL) {
-        assert(vm->slots <= taint && taint < vm->slots + vm->slot_used);
-
-        size_t size = 1 + (taint - vm->slots);
-
-        if (utf8_valid_length(*taint) > 0) {
-            assert(taint != vm->slots);
-
-            size -= 1;
-        }
-
-        memset(output, '?', size);
-        vm_slot_shift(vm, size);
-
-        return size;
-    }
-
     size_t len = utf8_valid_length(vm->slots[0]);
 
-    if (len == n) {
+    assert(len <= SLOT_SIZE);
+
+    if (len > 0 && len <= n) {
         memcpy(output, vm->slots, len);
         vm_slot_shift(vm, len);
         return len;
     }
-
     if (n == SLOT_SIZE) {
-        memset(output, '?', SLOT_SIZE);
-        vm_slot_shift(vm, SLOT_SIZE);
-        return SLOT_SIZE;
+        memcpy(output, vm->slots, n);
+        vm_slot_shift(vm, n);
+        return n;
     }
 
     return 0;
@@ -314,6 +293,13 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 \*/
 static bool vm_line_update_width(ufold_vm_t* vm)
 {
+#ifdef NDEBUG
+    // inharmonious logic
+    if (vm->config.max_width == 0) {
+        return true;
+    }
+#endif
+
     // recalculate TAB width
     size_t width = vm->offset;
 
@@ -331,29 +317,10 @@ static bool vm_line_update_width(ufold_vm_t* vm)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
-#ifdef NDEBUG
-    // inharmonious logic
-    if (vm->config.max_width == 0) {
-        memcpy(vm->line + vm->line_size, bytes, size);
-        vm->line_size += size;
+    assert(vm->line_size + size <= vm->max_size + SLOT_SIZE);
 
-        if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
-            if (!vm_flush(vm)) {
-                logged_return(false);
-            }
-        }
-        goto RESIZE;
-    }
-#endif
-
-    size_t width = vm->offset + vm->line_width;
-
-    if (!utf8_calc_width(bytes, size, vm->config.tab_width, &width)) {
-        logged_return(false);
-    }
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
-    vm->line_width += width - vm->offset - vm->line_width;
 
     if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
         if (!vm_flush(vm)) {
@@ -361,9 +328,6 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
         }
     }
 
-#ifdef NDEBUG
-RESIZE:
-#endif
     if (vm->line_size > vm->max_size) {
         // may be looking for the word boundary
         size_t max_size = vm->line_size * 2;
@@ -398,6 +362,10 @@ static bool vm_flush(ufold_vm_t* vm)
         return true;
     }
 #endif
+
+    if (!vm_line_update_width(vm)) {
+        logged_return(false);
+    }
 
     while (vm->line_size > 0) {
         if (vm->config.keep_indentation) {
@@ -497,7 +465,9 @@ static bool vm_flush(ufold_vm_t* vm)
             vm_line_shift(vm, size, width);
             vm->offset = vm->indent_width;
             // recalculate TAB width
-            vm_line_update_width(vm);
+            if (!vm_line_update_width(vm)) {
+                logged_return(false);
+            }
 
             vm->state = VM_WRAP;
         } else {
@@ -528,7 +498,6 @@ static bool vm_flush(ufold_vm_t* vm)
                 width = new_offset - vm->offset;
                 assert(size > 0 && width > 0);
 
-                // TODO: don't break ansi escape sequence?
                 if (!vm->config.write(vm->line, size) ||
                         !vm->config.write("\n", 1)) {
                     logged_return(false);
@@ -536,7 +505,9 @@ static bool vm_flush(ufold_vm_t* vm)
                 vm_line_shift(vm, size, width);
                 vm->offset = vm->indent_width;
                 // recalculate TAB width
-                vm_line_update_width(vm);
+                if (!vm_line_update_width(vm)) {
+                    logged_return(false);
+                }
 
                 vm->state = VM_WRAP;
             }

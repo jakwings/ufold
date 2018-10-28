@@ -62,40 +62,6 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
     return true;
 }
 
-const uint8_t* utf8_validate(const uint8_t* bytes, size_t size)
-{
-    static const uint8_t masks[] = {
-        0x7F,  // [0b01111111]
-        0xDF,  // [0b11011111, 0b10111111]
-        0xEF,  // [0b11101111, 0b10111111, 0b10111111]
-        0xF7,  // [0b11110111, 0b10111111, 0b10111111, 0b10111111]
-    };
-    const uint8_t* start = bytes;
-    const uint8_t* end = bytes + size;
-
-LOOP:
-    while (start < end) {
-        for (size_t i = 0; i < sizeof(masks)/sizeof(*masks); i++) {
-            if (start[0] == (start[0] & masks[i])) {
-                for (size_t j = 0; j < size - 1 && j < i; j++) {
-                    if (start[1+j] != (start[1+j] & 0xBF)) {
-                        return start + 1 + j;
-                    }
-                }
-                // incomplete sequence?
-                if (start + 1 + i < end) {
-                    return NULL;
-                }
-                // skip one valid sequence
-                start += 1 + i;
-                goto LOOP;
-            }
-        }
-        return start;
-    }
-    return NULL;
-}
-
 // TODO: deal with surrogate?
 size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
 {
@@ -103,7 +69,7 @@ size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
     utf8proc_ssize_t n_bytes = -1;
 
     for (size_t i = 0; i < size; i += n_bytes) {
-        if (ascii && bytes[i] > 0x7F) {
+        if ((ascii && bytes[i] > 0x7F) || utf8_valid_length(bytes[i]) == 0) {
             bytes[i] = '?';
             n_bytes = 1;
             continue;

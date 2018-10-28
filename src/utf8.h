@@ -32,17 +32,6 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
 
 /*\
  / DESCRIPTION
- /   Find invalid unit in the UTF-8 byte sequence.
- /   Only invalid successive byte is reported when the sequence is incomplete.
- /
- / RETURN
- /   BEAF :: address of the invalid byte
- /   NULL :: no invalid byte found
-\*/
-const uint8_t* utf8_validate(const uint8_t* bytes, size_t size);
-
-/*\
- / DESCRIPTION
  /   Sanitize the buffer in place for valid UTF-8 byte sequence.
  /
  / PARAMETERS
