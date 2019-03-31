@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 
-cd "$(dirname -- "$0")"
+cd -- "$(dirname -- "$0")"
 
 ufold=../build/ufold
 urandom=../build/urandom
 loop=42
 seconds=5
-seed=${1:-"$(date +%s)"}
+seed=${1:-$(date +%s)}
 
 printf '[SEED=%s]\n\n' "${seed}"
 
-if [[ ! -x "${ufold}" ]]; then
+if [ ! -x "${ufold}" ]; then
     ufold=$(type -p ufold)
-    if [[ "$?" -ne 0 ]]; then
+    if [ "$?" -ne 0 ]; then
         printf 'ufold not found\n'
         exit 1
     fi
@@ -25,7 +25,7 @@ function fold {
 
 function exit_if_failed {
     local exitcode=$?
-    if [[ "${exitcode}" -ne 0 ]]; then
+    if [ "${exitcode}" -ne 0 ]; then
         printf 'Failed\n'
         wc -c tmp_std{in,out}
         cat tmp_stderr
@@ -33,7 +33,7 @@ function exit_if_failed {
     fi
 }
 
-if [[ -r tmp_flags ]]; then
+if [ -r tmp_flags ]; then
     printf 'Retry the previous failed test: ufold %s ... ' "$(cat tmp_flags)"
     fold $(cat tmp_flags) < tmp_stdin > tmp_stdout 2> tmp_stderr
     exit_if_failed
@@ -58,7 +58,7 @@ while read -r flags; do
 
     cat "${output}" "${output}" > tmp_expect
     diff -u tmp_expect tmp_stdout > tmp_diff 2>&1
-    if [[ "$?" -ne 0 ]]; then
+    if [ "$?" -ne 0 ]; then
         printf 'Failed\n'
         cat tmp_diff
         exit 2
@@ -83,12 +83,12 @@ flags=(
 read_total=0
 read_delta=10086
 i=0
-while [[ $i -lt ${#flags[@]} ]]; do
+while [ $i -lt "${#flags[@]}" ]; do
     args=${flags[$i]}
     printf '%s\n' "${args}" > tmp_flags
 
     j=1
-    while [[ $j -le "${loop}" ]]; do
+    while [ $j -le "${loop}" ]; do
         printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" $j
 
         "${urandom}" "${seed}" "${read_total}" | head -c"${read_delta}" |

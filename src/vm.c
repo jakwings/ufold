@@ -434,6 +434,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 vm_line_shift(vm, size, width);
                 vm->offset += width;
             }
+
             continue;
         }
 
@@ -458,19 +459,11 @@ static bool vm_flush(ufold_vm_t* vm)
             if (!vm->config.write(vm->line, size)) {
                 logged_return(false);
             }
-#ifdef NDEBUG
-            if (end - vm->line == vm->line_size) {
-                vm->line_size = 0;
-                vm->line_width = 0;
-            } else {
-                vm_line_shift(vm, size, width);
-            }
-#else
             vm_line_shift(vm, size, width);
-#endif
             vm->offset = 0;
             vm->indent_size = 0;
             vm->indent_width = 0;
+
             // no need to recalculate TAB width
             vm->state = VM_LINE;
         } else if (word_end != NULL) {
@@ -502,8 +495,8 @@ static bool vm_flush(ufold_vm_t* vm)
                     vm->line_size = 0;
                     vm->line_width = 0;
                 }
-                vm->state = VM_WORD;
 
+                vm->state = VM_WORD;
                 // START->|indent word word ... word|<-MAX
                 // don't break inside a possibly incomplete word
                 return true;
