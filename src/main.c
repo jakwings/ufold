@@ -9,7 +9,7 @@
 #include "vm.h"
 
 #define PROGRAM "ufold"
-#define VERSION "1.0.0-lambda (Unicode 12.1.0)"
+#define VERSION "1.0.0-mu (Unicode 12.1.0)"
 
 #define COPYRIGHT "Copyright (c) 2018 J.W https://github.com/jakwings/ufold"
 #define LICENSE "License: https://opensource.org/licenses/ISC"
