@@ -122,13 +122,13 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
     size_t width = (config.max_width > 0) ? config.max_width : MAX_WIDTH;
     // check overflow
-    if (sizeof(uint32_t) > 0 && SIZE_MAX / width < sizeof(uint32_t)) {
+    if (sizeof(uint8_t) <= 0 || SIZE_MAX / width / 4 < sizeof(uint8_t)) {
         vm_free(vm, vm);
         return NULL;
     }
-    size_t size = sizeof(uint32_t) * width + SLOT_SIZE;
+    size_t size = sizeof(uint8_t) * 4 * width + SLOT_SIZE;
     // check overflow
-    if (size < sizeof(uint32_t) * width) {
+    if (size < sizeof(uint8_t) * 4 * width) {
         vm_free(vm, vm);
         return NULL;
     }
@@ -482,7 +482,7 @@ static bool vm_flush(ufold_vm_t* vm)
 
             size = end - vm->line;
 
-            // TODO: keep the original behavior of fold(1), i.e. no trim?
+            // IDEA: keep the original behavior of fold(1), i.e. no trim?
             if (vm->config.break_at_spaces) {
                 // trailing spaces will be trimmed
                 if (!vm->config.write(vm->line, word_end - vm->line) ||
