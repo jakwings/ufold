@@ -51,7 +51,7 @@ static void vm_slot_shift(ufold_vm_t* vm, size_t n);
 
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width);
 
-static bool vm_line_update_width(ufold_vm_t* vm);
+static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab);
 
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* input, size_t size);
 
@@ -304,7 +304,7 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
  / DESCRIPTION
  /   Update line width, especially for TABs.
 \*/
-static bool vm_line_update_width(ufold_vm_t* vm)
+static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 {
 #ifdef NDEBUG
     // inharmonious logic
@@ -313,7 +313,17 @@ static bool vm_line_update_width(ufold_vm_t* vm)
     }
 #endif
 
-    // recalculate TAB width
+    if (need_tab) {
+        for (size_t i = 0, j = vm->line_size; i < j; i++) {
+            if (vm->line[i] == '\t') {
+                break;
+            }
+            if (i + 1 == j) {
+                return true;
+            }
+        }
+    }
+
     size_t width = vm->offset;
 
     if (!utf8_calc_width(vm->line, vm->line_size, vm->config.tab_width,
@@ -385,7 +395,7 @@ static bool vm_flush(ufold_vm_t* vm)
     }
 #endif
 
-    if (!vm_line_update_width(vm)) {
+    if (!vm_line_update_width(vm, false)) {
         logged_return(false);
     }
 
@@ -470,17 +480,43 @@ static bool vm_flush(ufold_vm_t* vm)
             // maximum line width exceeded and break at whitespace
             assert(new_offset <= vm->config.max_width);
 
-            // end, not word_end, so as to write the trailing spaces as well
             size = end - vm->line;
 
-            if (!vm->config.write(vm->line, size) ||
-                    !vm->config.write("\n", 1)) {
-                logged_return(false);
+            // TODO: keep the original behavior of fold(1), i.e. no trim?
+            if (vm->config.break_at_spaces) {
+                // trailing spaces will be trimmed
+                if (!vm->config.write(vm->line, word_end - vm->line) ||
+                        !vm->config.write("\n", 1)) {
+                    logged_return(false);
+                }
+            } else {
+                // write the trailing spaces as well
+                if (!vm->config.write(vm->line, size) ||
+                        !vm->config.write("\n", 1)) {
+                    logged_return(false);
+                }
             }
             vm_line_shift(vm, size, width);
+
+            if (vm->config.break_at_spaces) {
+                vm->offset += width;
+
+                const uint8_t* word_start = vm->line;
+                size_t skipped_width = vm->offset;
+
+                if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
+                                &word_start, &skipped_width)) {
+                    logged_return(false);
+                }
+                skipped_width = skipped_width - vm->offset;
+
+                // trim leading spaces from original text
+                vm_line_shift(vm, word_start - vm->line, skipped_width);
+            }
+
             vm->offset = vm->indent_width;
             // recalculate TAB width
-            if (!vm_line_update_width(vm)) {
+            if (!vm_line_update_width(vm, true)) {
                 logged_return(false);
             }
 
@@ -520,7 +556,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 vm_line_shift(vm, size, width);
                 vm->offset = vm->indent_width;
                 // recalculate TAB width
-                if (!vm_line_update_width(vm)) {
+                if (!vm_line_update_width(vm, true)) {
                     logged_return(false);
                 }
 

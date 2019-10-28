@@ -208,8 +208,8 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
                     space_end = NULL;
                     word_end = word_ind;
                     alt_width = new_width;
+                    word_ind = NULL;
                 }
-                word_ind = NULL;
             }
         }
 
