@@ -315,10 +315,13 @@ static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 
     if (need_tab) {
         for (size_t i = 0, j = vm->line_size; i < j; i++) {
-            if (vm->line[i] == '\t') {
+            uint8_t c = vm->line[i];
+
+            if (is_linefeed(c)) {
+                return true;
+            } else if (c == '\t') {
                 break;
-            }
-            if (i + 1 == j) {
+            } else if (i + 1 == j) {
                 return true;
             }
         }
@@ -401,10 +404,20 @@ static bool vm_flush(ufold_vm_t* vm)
 
     while (vm->line_size > 0) {
         // hard break inside a wide character right before line-end
-        if (vm->state == VM_WRAP && is_linefeed(vm->line[0])) {
-            vm_line_shift(vm, 1, 0);
-            vm->state = VM_LINE;
-            continue;
+        if (vm->state == VM_WRAP) {
+            if (!vm->config.write("\n", 1)) {
+                logged_return(false);
+            }
+            if (is_linefeed(vm->line[0])) {
+                vm_line_shift(vm, 1, 0);
+                vm->offset = 0;
+                vm->indent_size = 0;
+                vm->indent_width = 0;
+
+                // no need to recalculate TAB width
+                vm->state = VM_LINE;
+                continue;
+            }
         }
 
         if (vm->config.keep_indentation) {
@@ -492,14 +505,12 @@ static bool vm_flush(ufold_vm_t* vm)
             // IDEA: keep the original behavior of fold(1), i.e. no trim?
             if (vm->config.break_at_spaces) {
                 // trailing spaces will be trimmed
-                if (!vm->config.write(vm->line, word_end - vm->line) ||
-                        !vm->config.write("\n", 1)) {
+                if (!vm->config.write(vm->line, word_end - vm->line)) {
                     logged_return(false);
                 }
             } else {
                 // write the trailing spaces as well
-                if (!vm->config.write(vm->line, size) ||
-                        !vm->config.write("\n", 1)) {
+                if (!vm->config.write(vm->line, size)) {
                     logged_return(false);
                 }
             }
@@ -556,8 +567,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 width = new_offset - vm->offset;
                 assert(size > 0 && width > 0);
 
-                if (!vm->config.write(vm->line, size) ||
-                        !vm->config.write("\n", 1)) {
+                if (!vm->config.write(vm->line, size)) {
                     logged_return(false);
                 }
                 vm_line_shift(vm, size, width);

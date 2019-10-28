@@ -50,13 +50,12 @@ while read -r flags; do
     printf '\r[TEST] ufold %-16s  %s ... ' "${flags}" "${input}"
 
     printf '%s\n' "${flags}" > tmp_flags
-    # please make sure each input end with a linefeed
-    cat "${input}" "${input}" |
+    cat "${input}" <(echo) "${input}" |
         tee tmp_stdin |
             fold $flags > tmp_stdout 2> tmp_stderr
     exit_if_failed
 
-    cat "${output}" "${output}" > tmp_expect
+    cat "${output}" <(echo) "${output}" > tmp_expect
     diff -u tmp_expect tmp_stdout > tmp_diff 2>&1
     if [ "$?" -ne 0 ]; then
         printf 'Failed\n'
