@@ -400,6 +400,13 @@ static bool vm_flush(ufold_vm_t* vm)
     }
 
     while (vm->line_size > 0) {
+        // hard break inside a wide character right before line-end
+        if (vm->state == VM_WRAP && is_linefeed(vm->line[0])) {
+            vm_line_shift(vm, 1, 0);
+            vm->state = VM_LINE;
+            continue;
+        }
+
         if (vm->config.keep_indentation) {
             // may change vm->state
             if (!vm_indent(vm)) {
