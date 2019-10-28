@@ -74,6 +74,10 @@ bool ufold_vm_flush(ufold_vm_t* vm);
  /   Feed input into the VM and output transformed text.
  /   Feeding an already stopped VM will return false.
  /
+ / PARAMETERS
+ /   input --> address of input
+ /    size --> size of input in bytes
+ /
  / RETURN
  /    true :: success
  /   false :: failure

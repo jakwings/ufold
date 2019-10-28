@@ -31,7 +31,7 @@ ______________________________________________________________________________
 
          -t, --tab <width>
                 Maximum columns for each TAB character. Default: 8.
-                Terminals may not support zero-width TABs.
+                It does not change any setting of the terminal.
 
          -i, --indent
                 Keep indentation for wrapped text.

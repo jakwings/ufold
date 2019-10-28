@@ -49,7 +49,7 @@ static const char* const manual =
 "\n"
 "         -t, --tab <width>\n"
 "                Maximum columns for each TAB character. Default: 8.\n"
-"                Terminals may not support zero-width TABs.\n"
+"                It does not change any setting of the terminal.\n"
 "\n"
 "         -i, --indent\n"
 "                Keep indentation for wrapped text.\n"
@@ -202,7 +202,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
         {"bytes",    no_argument,        NULL,  'b'},
         {"help",     no_argument,        NULL,  'h'},
         {"version",  no_argument,        NULL,  'V'},
-        {NULL,       0,                  NULL,  0 },
+        {NULL,       0,                  NULL,   0 },
     };
 
     size_t max_width = config->max_width;
@@ -343,7 +343,9 @@ FAIL:
         }
         exitcode = EXIT_FAILURE;
 
-        fclose(stream);  // whatever
+        if (stream != stdin) {
+            fclose(stream);  // whatever
+        }
     }
 
     // flush all output
