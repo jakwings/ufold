@@ -71,7 +71,7 @@ static const char* const manual =
 "\n"
 "         The program will concatenate all files' content"
           " as if there is only a single source of input,"
-          " i.e these two bash commands are equivalent:\n"
+          " i.e these two shell commands are equivalent:\n"
 "                " P " file1 file2 ;\n"
 "                cat file1 file2 | " P " ;\n"
 "\n"
