@@ -216,14 +216,23 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
     int c = -1;
 
-    while ((c = getopt_long(*argc, *argv, "w:t:isbhV", opts, NULL)) != -1) {
+    opterr = 0;
+    while ((c = getopt_long(*argc, *argv, ":w:t:isbhV", opts, NULL)) != -1) {
         switch (c) {
             case 'i': to_keep_indentation = true; break;
             case 's': to_break_at_spaces = true; break;
             case 'b': to_truncate_bytes = true; break;
             case 'V': to_print_version = true; break;
-            case ':': return false;
-            case '?': return false;
+            case ':':
+                if (!opterr) {
+                    warn("option \"-%c\" requires an argument", optopt);
+                }
+                return false;
+            case '?':
+                if (!opterr) {
+                    warn("invalid option \"-%c\"", optopt);
+                }
+                return false;
             case 'h':
                 if (!strcmp("--help", (*argv)[optind-1])) {
                     to_print_manual = true;
