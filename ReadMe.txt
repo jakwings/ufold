@@ -52,7 +52,7 @@ ______________________________________________________________________________
                 All arguments after two dashes are not treated as options.
 
          The program will concatenate all files' content as if there is only a
-         single source of input, i.e these two bash commands are equivalent:
+         single source of input, i.e these two shell commands are equivalent:
                 ufold file1 file2 ;
                 cat file1 file2 | ufold ;
 
