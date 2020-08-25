@@ -266,17 +266,18 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
 static bool wrap_input(ufold_vm_t* vm, FILE* stream)
 {
-    char* line = NULL;
-    size_t capacity = 0;
+#define BUFSIZE 4096
+    char buf[BUFSIZE];
     ssize_t size = -1;
 
-    while ((size = getline(&line, &capacity, stream)) > 0) {
-        if (!ufold_vm_feed(vm, line, size)) {
-            free(line);
+    while ((size = fread(buf, 1, BUFSIZE, stream)) >= 0) {
+        if (!ufold_vm_feed(vm, buf, size)) {
             return false;
         }
+        if (feof(stream)) {
+            break;
+        }
     }
-    free(line);
 
     return !ferror(stream);
 }
