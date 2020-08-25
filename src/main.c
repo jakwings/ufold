@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "optparse.h"
 #include "stdbool.h"
 #include "vm.h"
 
@@ -195,14 +196,15 @@ static void print_version(ufold_vm_config_t config)
 
 static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 {
-    static const struct option opts[] = {
-        {"width",    required_argument,  NULL,  'w'},
-        {"tab",      required_argument,  NULL,  't'},
-        {"spaces",   no_argument,        NULL,  's'},
-        {"bytes",    no_argument,        NULL,  'b'},
-        {"help",     no_argument,        NULL,  'h'},
-        {"version",  no_argument,        NULL,  'V'},
-        {NULL,       0,                  NULL,   0 },
+    struct optparse_long optspecs[] = {
+        {"width",    'w',  OPTPARSE_REQUIRED},
+        {"tab",      't',  OPTPARSE_REQUIRED},
+        {"indent",   'i',  OPTPARSE_NONE},
+        {"spaces",   's',  OPTPARSE_NONE},
+        {"bytes",    'b',  OPTPARSE_NONE},
+        {"help",     'h',  OPTPARSE_NONE},
+        {"version",  'V',  OPTPARSE_NONE},
+        {0}
     };
 
     size_t max_width = config->max_width;
@@ -215,50 +217,44 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     bool to_truncate_bytes = false;
 
     int c = -1;
+    struct optparse opt;
 
-    opterr = 0;
-    while ((c = getopt_long(*argc, *argv, ":w:t:isbhV", opts, NULL)) != -1) {
+    optparse_init(&opt, *argv);
+    while ((c = optparse_long(&opt, optspecs, NULL)) != -1) {
         switch (c) {
             case 'i': to_keep_indentation = true; break;
             case 's': to_break_at_spaces = true; break;
             case 'b': to_truncate_bytes = true; break;
             case 'V': to_print_version = true; break;
-            case ':':
-                if (!opterr) {
-                    warn("option \"-%c\" requires an argument", optopt);
-                }
-                return false;
             case '?':
-                if (!opterr) {
-                    warn("invalid option \"-%c\"", optopt);
-                }
+                warn("%s", opt.errmsg);
                 return false;
             case 'h':
-                if (!strcmp("--help", (*argv)[optind-1])) {
+                if (!strcmp("--help", (opt.argv)[opt.optind-1])) {
                     to_print_manual = true;
                 } else {
                     to_print_help = true;
                 }
                 break;
             case 't':
-                if (!parse_integer(optarg, &tab_width)) {
-                    warn("%s", "-t, --tab requires a non-negative integer");
+                if (!parse_integer(opt.optarg, &tab_width)) {
+                    warn("option requires a non-negative integer -- '%c'", c);
                     return false;
                 }
                 break;
             case 'w':
-                if (!parse_integer(optarg, &max_width)) {
-                    warn("%s", "-w, --width requires a non-negative integer");
+                if (!parse_integer(opt.optarg, &max_width)) {
+                    warn("option requires a non-negative integer -- '%c'", c);
                     return false;
                 }
                 break;
             default:
-                warn("unhandled cases, please report bugs to %s", ISSUES);
+                warn("unhandled option '%c', please report to %s", c, ISSUES);
                 exit(EXIT_FAILURE);
         }
     }
-    *argc -= optind;
-    *argv += optind;
+    *argc -= opt.optind;
+    *argv += opt.optind;
 
     config->max_width = max_width;
     config->tab_width = tab_width;

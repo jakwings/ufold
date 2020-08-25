@@ -7,11 +7,11 @@ OBJECTS += utf8proc/libutf8proc.a pcg-c/src/libpcg_random.a
 OBJECTS += build/test build/urandom
 
 unexport CFLAGS
-override CFLAGS := ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
+override CFLAGS := -O2 ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
                    -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH}
 
 ifndef DEBUG
-    override CFLAGS += -O2 -DNDEBUG
+    override CFLAGS += -DNDEBUG
 else
     override CFLAGS += -O0 -g
 endif
@@ -38,7 +38,7 @@ ${OBJECTS}: | build/
 build/:
 	@mkdir -p $@
 
-build/ufold: src/main.c build/ufold.a
+build/ufold: src/main.c src/optparse.c build/ufold.a
 	${CC} ${CFLAGS} -o $@ $^
 
 build/ufold.h: src/vm.h
