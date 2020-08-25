@@ -306,13 +306,6 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 \*/
 static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 {
-#ifdef NDEBUG
-    // inharmonious logic
-    if (vm->config.max_width == 0) {
-        return true;
-    }
-#endif
-
     if (need_tab) {
         for (size_t i = 0, j = vm->line_size; i < j; i++) {
             uint8_t c = vm->line[i];
