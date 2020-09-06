@@ -62,6 +62,8 @@ static bool vm_flush(ufold_vm_t* vm);
 
 static bool vm_indent(ufold_vm_t* vm);
 
+static void vm_indent_reset(ufold_vm_t* vm);
+
 static bool skip_punctuation(const uint8_t* bytes, size_t size,
                              size_t tab_width, const char* punctuation,
                              const uint8_t** index, size_t* line_width);
@@ -413,9 +415,7 @@ static bool vm_flush(ufold_vm_t* vm)
             if (is_linefeed(vm->line[0])) {
                 vm_line_shift(vm, 1, 0);
                 vm->offset = 0;
-                vm->indent_size = 0;
-                vm->indent_width = 0;
-                vm->indent_hanging = false;
+                vm_indent_reset(vm);
 
                 // no need to recalculate TAB width
                 vm->state = VM_LINE;
@@ -459,9 +459,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 vm->line_size = 0;
                 vm->line_width = 0;
                 vm->offset = 0;
-                vm->indent_size = 0;
-                vm->indent_width = 0;
-                vm->indent_hanging = false;
+                vm_indent_reset(vm);
 
                 vm->state = VM_LINE;
             } else {
@@ -495,9 +493,7 @@ static bool vm_flush(ufold_vm_t* vm)
             }
             vm_line_shift(vm, size, width);
             vm->offset = 0;
-            vm->indent_size = 0;
-            vm->indent_width = 0;
-            vm->indent_hanging = false;
+            vm_indent_reset(vm);
 
             // no need to recalculate TAB width
             vm->state = VM_LINE;
@@ -693,6 +689,32 @@ static bool vm_indent(ufold_vm_t* vm)
     return true;
 }
 
+/*\
+ / DESCRIPTION
+ /   Reset line indent.
+\*/
+static void vm_indent_reset(ufold_vm_t* vm)
+{
+    // keep vm->indent and vm->indent_bufsize intact
+    vm->indent_size = 0;
+    vm->indent_width = 0;
+    vm->indent_hanging = false;
+}
+
+/*\
+ / DESCRIPTION
+ /   Calculate the index after skipping consecutive punctuation.
+ /
+ / PARAM
+ /     tab_width --> maximum tab width (columns)
+ /   punctuation --> non-whitespace characters to skip
+ /        *index <-- end of skipped content (exclusive)
+ /   *line_width <-> distance from the start of line (columns)
+ /
+ / RETURN
+ /    true :: success
+ /   false :: failure
+\*/
 static bool skip_punctuation(const uint8_t* bytes, size_t size,
                              size_t tab_width, const char* punctuation,
                              const uint8_t** index, size_t* line_width)
