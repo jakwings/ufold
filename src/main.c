@@ -5,8 +5,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "optparse.h"
 #include "stdbool.h"
+#include "../utf8proc/utf8proc.h"
+#include "optparse.h"
 #include "vm.h"
 
 #define PROGRAM "ufold"
@@ -16,7 +17,7 @@
 #define LICENSE "License: https://opensource.org/licenses/ISC"
 #define ISSUES "https://github.com/jakwings/ufold/issues"
 
-#define warn(fmt, ...) fprintf(stderr, "[ERROR] " fmt "\n", __VA_ARGS__)
+#define warn(fmt, ...) fprintf(stderr, "%s " fmt "\n", "[ERROR]", __VA_ARGS__)
 
 #define P PROGRAM
 
@@ -30,6 +31,7 @@ static const char* const manual =
 "\n"
 "         " P " [-w WIDTH | --width=WIDTH]\n"
 "               [-t WIDTH | --tab=WIDTH]\n"
+"               [-p[CHARS] | --hang[=CHARS]]\n"
 "               [-i | --indent]\n"
 "               [-s | --spaces]\n"
 "               [-b | --bytes]\n"
@@ -51,6 +53,11 @@ static const char* const manual =
 "         -t, --tab <width>\n"
 "                Maximum columns for each TAB character. Default: 8.\n"
 "                It does not change any setting of the terminal.\n"
+"\n"
+"         -p, --hang[=<characters>]\n"
+"                Hanging punctuation. Default: (none).\n"
+"                Respect hanging punctuation while indenting.\n"
+"                If characters are not provided, use the preset.\n"
 "\n"
 "         -i, --indent\n"
 "                Keep indentation for wrapped text.\n"
@@ -85,7 +92,7 @@ static const char* const manual =
                  " will still insert a hard break inside the text.\n"
 "\n"
 "                Byte sequences that are not conforming with UTF-8 encoding"
-                 " will be filtered before output. The flag --bytes (-b) will"
+                 " will be filtered before output.  The flag --bytes (-b) will"
                  " enforce the ASCII encoding in order to sanitize the input.\n"
 "\n"
 "  COPYRIGHT\n"
@@ -103,13 +110,14 @@ static const char* const usage =
 "    When no file is specified, read from standard input.\n"
 "\n"
 "OPTIONS\n"
-"    -w, --width <width>  Maximum columns for each line.\n"
-"    -t, --tab <width>    Maximum columns for each TAB character.\n"
-"    -i, --indent         Keep indentation for wrapped text.\n"
-"    -s, --spaces         Break lines at spaces.\n"
-"    -b, --bytes          Count bytes rather than columns.\n"
-"    -h, --help           Show help information.\n"
-"    -V, --version        Show version information.\n"
+"    -w, --width <width>   Maximum columns for each line.\n"
+"    -t, --tab <width>     Maximum columns for each TAB character.\n"
+"    -p, --hang[=<chars>]  Hanging punctuation.\n"
+"    -i, --indent          Keep indentation for wrapped text.\n"
+"    -s, --spaces          Break lines at spaces.\n"
+"    -b, --bytes           Count bytes rather than columns.\n"
+"    -h, --help            Show help information.\n"
+"    -V, --version         Show version information.\n"
 ;
 
 static bool write_to_stdout(const void* s, size_t n)
@@ -165,9 +173,35 @@ static bool parse_integer(const char* str, size_t* num)
     return true;
 }
 
+static bool check_punctuation(const char* bytes, size_t size)
+{
+    utf8proc_int32_t codepoint = -1;
+    utf8proc_ssize_t n_bytes = -1;
+
+    for (size_t i = 0; i < size; i += n_bytes) {
+        n_bytes = utf8proc_iterate((uint8_t*)bytes + i, size - i, &codepoint);
+
+        if (n_bytes == 0) {
+            break;
+        }
+        if (n_bytes < 0) {
+            return false;
+        }
+        if (codepoint <= 0x20 || codepoint == 0x7F ||
+                utf8proc_category(codepoint) == UTF8PROC_CATEGORY_CC ||
+                utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS ||
+                utf8proc_charwidth(codepoint) < 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 static void print_manual(ufold_vm_config_t config)
 {
     config.write = write_to_stdout;
+    config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
     config.truncate_bytes = false;
@@ -178,6 +212,7 @@ static void print_manual(ufold_vm_config_t config)
 static void print_help(bool error, ufold_vm_config_t config)
 {
     config.write = error ? write_to_stderr : write_to_stdout;
+    config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
     config.truncate_bytes = false;
@@ -190,6 +225,7 @@ static void print_version(ufold_vm_config_t config)
 {
     char* info = PROGRAM " " VERSION "\n" COPYRIGHT "\n" LICENSE "\n";
     config.write = write_to_stdout;
+    config.hang_punctuation = false;
 
     exit(vwrite(info, strlen(info), config) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -199,6 +235,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     struct optparse_long optspecs[] = {
         {"width",    'w',  OPTPARSE_REQUIRED},
         {"tab",      't',  OPTPARSE_REQUIRED},
+        {"hang",     'p',  OPTPARSE_OPTIONAL},
         {"indent",   'i',  OPTPARSE_NONE},
         {"spaces",   's',  OPTPARSE_NONE},
         {"bytes",    'b',  OPTPARSE_NONE},
@@ -209,6 +246,8 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
     size_t max_width = config->max_width;
     size_t tab_width = config->tab_width;
+    char* punctuation = NULL;
+    bool to_hang_punctuation = false;
     bool to_print_help = false;
     bool to_print_manual = false;
     bool to_print_version = false;
@@ -236,6 +275,22 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
                     to_print_help = true;
                 }
                 break;
+            case 'p':
+                if (opt.optarg == NULL) {
+                    punctuation = NULL;
+                    to_hang_punctuation = true;
+                } else if (strlen(opt.optarg) > 0) {
+                    if (!check_punctuation(opt.optarg, strlen(opt.optarg))) {
+                        warn("option requires non-whitespace characters in the UTF-8 encoding -- '%c'", c);
+                        return false;
+                    }
+                    punctuation = opt.optarg;
+                    to_hang_punctuation = true;
+                } else {
+                    punctuation = NULL;
+                    to_hang_punctuation = false;
+                }
+                break;
             case 't':
                 if (!parse_integer(opt.optarg, &tab_width)) {
                     warn("option requires a non-negative integer -- '%c'", c);
@@ -258,6 +313,8 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
     config->max_width = max_width;
     config->tab_width = tab_width;
+    config->punctuation = punctuation;
+    config->hang_punctuation = to_hang_punctuation;
     config->keep_indentation = to_keep_indentation;
     config->break_at_spaces = to_break_at_spaces;
     config->truncate_bytes = to_truncate_bytes;
@@ -299,6 +356,8 @@ int main(int argc, char** argv)
     ufold_vm_config_t config = {
         .max_width = MAX_WIDTH,
         .tab_width = TAB_WIDTH,
+        .punctuation = NULL,
+        .hang_punctuation = false,
         .keep_indentation = false,
         .break_at_spaces = false,
         .truncate_bytes = false,

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../utf8proc/utf8proc.h"
 #include "utf8.h"
 #include "utils.h"
 #include "vm.h"
@@ -28,11 +29,13 @@ struct ufold_vm_struct {
     uint8_t* indent;
     size_t indent_size;
     size_t indent_width;
+    size_t indent_bufsize;
     size_t offset;  // (width) if buffer start is not at line start
     size_t line_size;
     size_t line_width;  // only updated when needed (in order to save time)
     // Switches
     vm_state_t state;
+    bool indent_hanging;  // hanging punctuation
     bool stopped;
 };
 //typedef struct ufold_vm_struct ufold_vm_t;
@@ -58,6 +61,10 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* input, size_t size);
 static bool vm_flush(ufold_vm_t* vm);
 
 static bool vm_indent(ufold_vm_t* vm);
+
+static bool skip_punctuation(const uint8_t* bytes, size_t size,
+                             size_t tab_width, const char* punctuation,
+                             const uint8_t** index, size_t* line_width);
 
 /*\
  / DESCRIPTION
@@ -145,6 +152,8 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
+    vm->indent_bufsize = 0;
+    vm->indent_hanging = false;
     vm->offset = 0;
     vm->line_size = 0;
     vm->line_width = 0;
@@ -406,6 +415,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 vm->offset = 0;
                 vm->indent_size = 0;
                 vm->indent_width = 0;
+                vm->indent_hanging = false;
 
                 // no need to recalculate TAB width
                 vm->state = VM_LINE;
@@ -422,20 +432,20 @@ static bool vm_flush(ufold_vm_t* vm)
                 assert(vm->state == VM_LINE || vm->state == VM_FULL);
                 return true;
             }
-        } else {
-            if (vm->config.max_width == 0) {
-                vm->state = VM_FULL;
-            }
         }
         assert(vm->line_size > 0);
+
+        if (vm->config.max_width == 0) {
+            vm->state = VM_FULL;
+        }
 
         if (vm->state == VM_FULL) {
             const uint8_t* end = NULL;
             size_t new_offset = vm->offset;
-            bool found = false;
+            bool eol_found = false;
 
             if (!find_eol(vm->line, vm->line_size, vm->config.tab_width,
-                          &end, &new_offset, &found)) {
+                          &end, &new_offset, &eol_found)) {
                 logged_return(false);
             }
             size_t size = end - vm->line;
@@ -445,12 +455,13 @@ static bool vm_flush(ufold_vm_t* vm)
                 logged_return(false);
             }
 
-            if (found) {
+            if (eol_found) {
                 vm->line_size = 0;
                 vm->line_width = 0;
                 vm->offset = 0;
                 vm->indent_size = 0;
                 vm->indent_width = 0;
+                vm->indent_hanging = false;
 
                 vm->state = VM_LINE;
             } else {
@@ -486,6 +497,7 @@ static bool vm_flush(ufold_vm_t* vm)
             vm->offset = 0;
             vm->indent_size = 0;
             vm->indent_width = 0;
+            vm->indent_hanging = false;
 
             // no need to recalculate TAB width
             vm->state = VM_LINE;
@@ -590,31 +602,67 @@ static bool vm_indent(ufold_vm_t* vm)
         const uint8_t* line_end = vm->line + vm->line_size;
         const uint8_t* indent_end = vm->line;
         size_t width = vm->indent_width;
+        size_t size = 0;
 
-        if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
-                        &indent_end, &width)) {
-            logged_return(false);
+        if (!(vm->config.hang_punctuation && vm->indent_hanging)) {
+           if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
+                           &indent_end, &width)) {
+               logged_return(false);
+           }
         }
-        width = width - vm->indent_width;
 
-        size_t size = indent_end - vm->line;
+        size_t hang_width = 0;
+        size_t hang_size = 0;
+
+        if (vm->config.hang_punctuation) {
+            const uint8_t* old_indent_end = indent_end;
+            size_t old_width = width;
+
+            if (!skip_punctuation(indent_end, line_end - indent_end,
+                                  vm->config.tab_width, vm->config.punctuation,
+                                  &indent_end, &width)) {
+                logged_return(false);
+            }
+            hang_width = width - old_width;
+            hang_size = indent_end - old_indent_end;
+            vm->indent_hanging = vm->indent_hanging || hang_size > 0;
+        }
+
+        width = width - vm->indent_width;
+        size = indent_end - vm->line;
 
         if (size > 0) {
             size_t buf_size = vm->indent_size + size;
+            if (hang_size > 0 && width > size) {
+                // later, turn punctuation into spaces
+                buf_size = vm->indent_size + width;
+            }
             // check overflow
             if (buf_size < vm->indent_size) {
                 logged_return(false);
             }
-            uint8_t* buf = vm_realloc(vm, vm->indent, vm->indent_size + size);
+            if (buf_size > vm->indent_bufsize) {
+                uint8_t* buf = vm_realloc(vm, vm->indent, buf_size);
 
-            if (buf == NULL) {
-                logged_return(false);
+                if (buf == NULL) {
+                    logged_return(false);
+                }
+                vm->indent = buf;
+                vm->indent_bufsize = buf_size;
             }
-            vm->indent = buf;
 
             memcpy(vm->indent + vm->indent_size, vm->line, size);
             vm->indent_size += size;
             vm->indent_width += width;
+            if (hang_size > 0) {
+                uint8_t* hang_e = vm->indent + vm->indent_size;
+                uint8_t* hang_s = hang_e - hang_size;
+                while (hang_s < hang_e) {
+                    *hang_s = ' ';
+                    ++hang_s;
+                }
+                vm->indent_size = vm->indent_size - hang_size + hang_width;
+            }
 
             if (!vm->config.write(vm->line, size)) {
                 logged_return(false);
@@ -642,5 +690,73 @@ static bool vm_indent(ufold_vm_t* vm)
             }
         }
     }
+    return true;
+}
+
+static bool skip_punctuation(const uint8_t* bytes, size_t size,
+                             size_t tab_width, const char* punctuation,
+                             const uint8_t** index, size_t* line_width)
+{
+    bool use_preset = punctuation == NULL;
+    char buf[5];
+
+    const uint8_t* new_index = bytes;
+    size_t new_width = *line_width;
+    int w = -1;
+
+    utf8proc_int32_t codepoint = -1;
+    utf8proc_ssize_t n_bytes = -1;
+    utf8proc_category_t category;
+
+    for (size_t i = 0; i < size; i += n_bytes) {
+        n_bytes = utf8proc_iterate(bytes + i, size - i, &codepoint);
+
+        if (n_bytes == 0) {
+            break;
+        }
+        if (n_bytes < 0 || n_bytes > 4) {
+            logged_return(false);
+        }
+
+        if (use_preset) {
+            if (!(codepoint < 0x7F && strchr("\"`'([{", (int)codepoint))
+                    // ‘ ’ “
+                    && codepoint != 0x2018
+                    && codepoint != 0x2019
+                    && codepoint != 0x201C) {
+                category = utf8proc_category(codepoint);
+                if (category != UTF8PROC_CATEGORY_PI &&
+                        category != UTF8PROC_CATEGORY_PS) {
+                    break;
+                }
+            }
+        } else {
+            category = utf8proc_category(codepoint);
+            // also disallow \t
+            if (category == UTF8PROC_CATEGORY_ZS ||
+                    category == UTF8PROC_CATEGORY_CC) {
+                break;
+            }
+            memcpy(buf, bytes + i, n_bytes);
+            buf[n_bytes] = '\0';
+            if (strstr(punctuation, buf) == NULL) {
+                break;
+            }
+        }
+
+        if ((w = utf8proc_charwidth(codepoint)) < 0) {
+            logged_return(false);
+        }
+        // check overflow
+        if (new_width + w < new_width) {
+            logged_return(false);
+        }
+        new_width += w;
+
+        new_index = bytes + i + n_bytes;
+    }
+
+    *index = new_index;
+    *line_width = new_width;
     return true;
 }

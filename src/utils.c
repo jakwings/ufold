@@ -9,16 +9,15 @@ bool is_controlchar(utf8proc_int32_t codepoint)
         case '\b': case '\033': case '\f': case '\r': case '\v': return true;
     }
     return codepoint < 0x20 || codepoint == 0x7F ||
-        (codepoint > 0x7F &&
-         // TODO: more investigation later
-         utf8proc_category(codepoint) == UTF8PROC_CATEGORY_CC);
+        (codepoint > 0x7F
+         && utf8proc_category(codepoint) == UTF8PROC_CATEGORY_CC);
 }
 
 bool is_whitespace(utf8proc_int32_t codepoint)
 {
     return codepoint == ' ' || codepoint == '\t' ||
-        (utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS &&
-         !is_linefeed(codepoint));
+        (utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS
+         && !is_linefeed(codepoint));
 }
 
 bool is_linefeed(utf8proc_int32_t codepoint)

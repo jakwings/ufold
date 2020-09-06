@@ -11,6 +11,7 @@ ______________________________________________________________________________
 
          ufold [-w WIDTH | --width=WIDTH]
                [-t WIDTH | --tab=WIDTH]
+               [-p[CHARS] | --hang[=CHARS]]
                [-i | --indent]
                [-s | --spaces]
                [-b | --bytes]
@@ -32,6 +33,11 @@ ______________________________________________________________________________
          -t, --tab <width>
                 Maximum columns for each TAB character. Default: 8.
                 It does not change any setting of the terminal.
+
+         -p, --hang[=<characters>]
+                Hanging punctuation. Default: (none).
+                Respect hanging punctuation while indenting.
+                If characters are not provided, use the preset.
 
          -i, --indent
                 Keep indentation for wrapped text.
@@ -65,7 +71,7 @@ ______________________________________________________________________________
                 will still insert a hard break inside the text.
 
                 Byte sequences that are not conforming with UTF-8 encoding
-                will be filtered before output. The flag --bytes (-b) will
+                will be filtered before output.  The flag --bytes (-b) will
                 enforce the ASCII encoding in order to sanitize the input.
 
   COPYRIGHT
