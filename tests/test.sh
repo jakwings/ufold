@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 
 cd -- "$(dirname -- "$0")"
 
@@ -6,12 +6,12 @@ ufold=../build/ufold
 urandom=../build/urandom
 loop=42
 seconds=5
-seed=${1:-$(date +%s)}
+seed="${1:-$(date '+%s')}"
 
 printf '[SEED=%s]\n\n' "${seed}"
 
 if [ ! -x "${ufold}" ]; then
-    ufold=$(type -p ufold)
+    ufold="$(type -p ufold)"
     if [ "$?" -ne 0 ]; then
         printf 'ufold not found\n'
         exit 1
@@ -19,15 +19,15 @@ if [ ! -x "${ufold}" ]; then
 fi
 printf 'Using ufold: %s\n' "${ufold}"
 
-function fold {
+fold() {
     timeout "${seconds}" "${ufold}" "$@"
 }
 
-function exit_if_failed {
+exit_if_failed() {
     local exitcode=$?
     if [ "${exitcode}" -ne 0 ]; then
         printf 'Failed\n'
-        wc -c tmp_std{in,out}
+        wc -c tmp_stdin tmp_stdout
         cat tmp_stderr
         exit "${exitcode}"
     fi
@@ -43,19 +43,19 @@ fi
 # test regular inputs
 i=1
 while read -r flags; do
-    num=$(printf %03d $i)
+    num="$(printf '%03d' "${i}")"
     input="fixtures/${num}.in"
     output="fixtures/${num}.out"
 
     printf '\r[TEST] ufold %-16s  %s ... ' "${flags}" "${input}"
 
     printf '%s\n' "${flags}" > tmp_flags
-    cat "${input}" <(echo) "${input}" |
+    { cat "${input}"; echo; cat "${input}"; } |
         tee tmp_stdin |
             fold $flags > tmp_stdout 2> tmp_stderr
     exit_if_failed
 
-    cat "${output}" <(echo) "${output}" > tmp_expect
+    { cat "${output}"; echo; cat "${output}"; } > tmp_expect
     diff -u tmp_expect tmp_stdout > tmp_diff 2>&1
     if [ "$?" -ne 0 ]; then
         printf 'Failed\n'
@@ -69,26 +69,34 @@ while read -r flags; do
 done < flags.txt
 
 # test exit status
-flags=(
-    -V -h ''
-    -w{8..0}
-    -t{8..0}
-    -w{8..0}\ -t{8..0}
-    -{b,s,i,bs,bi,is,bis}
-    -{b,s,i,bs,bi,is,bis}\ -w{8..0}
-    -{b,s,i,bs,bi,is,bis}\ -t{8..0}
-    -{b,s,i,bs,bi,is,bis}\ -w{8..0}\ -t{8..0}
-)
+flags_w="$(printf ' -w%s ' $(seq 8 -1 0))"
+flags_t="$(printf ' -t%s ' $(seq 8 -1 0))"
+flags_bis='-b -s -i -bs -bi -is -bis'
+flags=" \
+    -V -h '' \
+    ${flags_w} \
+    ${flags_t} \
+    $(for opt in ${flags_w}; do printf " '${opt} %s' " ${flags_t}; done) \
+    ${flags_bis} \
+    $(for opt in ${flags_bis}; do printf " '${opt} %s' " ${flags_w}; done) \
+    $(for opt in ${flags_bis}; do printf " '${opt} %s' " ${flags_t}; done) \
+    $(
+      for opt_bis in ${flags_bis}; do
+          for opt_w in ${flags_w}; do
+              printf " '${opt_bis} ${opt_w} %s' " ${flags_t}
+          done
+      done
+    ) \
+"
 read_total=0
 read_delta=10086
-i=0
-while [ $i -lt "${#flags[@]}" ]; do
-    args=${flags[$i]}
+eval "set -- ${flags}"
+for args; do
     printf '%s\n' "${args}" > tmp_flags
 
-    j=1
-    while [ $j -le "${loop}" ]; do
-        printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" $j
+    i=1
+    while [ "${i}" -le "${loop}" ]; do
+        printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" "${i}"
 
         "${urandom}" "${seed}" "${read_total}" | head -c"${read_delta}" |
             tee tmp_stdin |
@@ -96,11 +104,9 @@ while [ $i -lt "${#flags[@]}" ]; do
         exit_if_failed
 
         read_total=$(( read_total + read_delta ))
-        j=$(( j + 1 ))
+        i=$(( i + 1 ))
     done
     printf 'Done\n'
-
-    i=$(( i + 1 ))
 done
 
 rm -f tmp_*
