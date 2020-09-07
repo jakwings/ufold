@@ -34,6 +34,7 @@ struct ufold_vm_struct {
     size_t line_width;  // only updated when needed (in order to save time)
     // Switches
     vm_state_t state;
+    bool slot_crlf;  // whether the previously processed codepoint is CR
     bool indent_hanging;  // hanging punctuation
     bool stopped;
 };
@@ -48,8 +49,6 @@ static void* vm_realloc(ufold_vm_t* vm, void* ptr, size_t size);
 static void vm_free(ufold_vm_t* vm, void* ptr);
 
 static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output);
-
-static void vm_slot_shift(ufold_vm_t* vm, size_t n);
 
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width);
 
@@ -150,6 +149,7 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     vm->max_size = size - SLOT_SIZE;
 
     vm->slot_used = 0;
+    vm->slot_crlf = false;
     vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
@@ -248,13 +248,23 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
 {
     assert(vm->slot_used < SLOT_SIZE);
 
-    size_t n = vm->slot_used;
-
     if (byte != NULL) {
-        vm->slots[n++] = *byte;
-        vm->slot_used = n;
+        bool ok = true;
+        uint8_t c = *byte;
+
+        // NOTE: ASCII Normalization: CRLF, CR -> LF
+        if (c == '\r') {
+            vm->slot_crlf = true;
+            c = '\n';
+        } else {
+            ok = !(c == '\n' && vm->slot_crlf);
+            vm->slot_crlf = false;
+        }
+        if (ok) {
+            vm->slots[vm->slot_used++] = c;
+        }
     }
-    if (n <= 0) {
+    if (vm->slot_used <= 0) {
         return 0;
     }
 
@@ -263,36 +273,30 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
     assert(len <= SLOT_SIZE);
 
     if (len > 0) {
-        if (len <= n) {
+        if (len <= vm->slot_used) {
+            assert(len == vm->slot_used);
+            // NOTE: UTF-8 Normalization: U+2028, U+2029, U+0085 -> LF
+            if ((len == 3 && memcmp(vm->slots, "\xE2\x80\xA8", 3) == 0) ||
+                    (len == 3 && memcmp(vm->slots, "\xE2\x80\xA9", 3) == 0) ||
+                    (len == 2 && memcmp(vm->slots, "\xC2\x85", 2) == 0)) {
+                output[0] = '\n';
+                vm->slot_used = 0;
+                return 1;
+            }
             memcpy(output, vm->slots, len);
-            vm_slot_shift(vm, len);
+            vm->slot_used = 0;
             return len;
         }
         return 0;
     } else {
+        assert(vm->slot_used == 1);
         // invalid bytes are queued before valid bytes need them
         output[0] = vm->slots[0];
-        vm_slot_shift(vm, 1);
+        vm->slot_used = 0;
         return 1;
     }
 
     return 0;
-}
-
-/*\
- / DESCRIPTION
- /   Shift the VM's buffer queuing slots by N places.
-\*/
-static void vm_slot_shift(ufold_vm_t* vm, size_t n)
-{
-    assert(vm->slot_used >= n);
-
-    if (vm->slot_used <= n) {
-        vm->slot_used = 0;
-    } else {
-        memmove(vm->slots, vm->slots + n, vm->slot_used - n);
-        vm->slot_used -= n;
-    }
 }
 
 /*\
