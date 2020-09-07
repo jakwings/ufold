@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "stdbool.h"
 #include "../utf8proc/utf8proc.h"
 #include "optparse.h"
@@ -329,21 +330,38 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 
 static bool wrap_input(ufold_vm_t* vm, FILE* stream)
 {
-#define BUFSIZE 4096
-    char buf[BUFSIZE];
-    do {
-        size_t size = fread(buf, 1, BUFSIZE, stream);
+    bool is_interactive = isatty(fileno(stream));
 
-        if (ferror(stream)) {
-            return false;
-        }
-        if (!ufold_vm_feed(vm, buf, size)) {
-            return false;
-        }
-        if (has_linefeed((uint8_t*)buf, size) && !ufold_vm_flush(vm)) {
-            return false;
-        }
-    } while (!feof(stream));
+    if (!is_interactive) {
+#define BUFSIZE 4096
+        char buf[BUFSIZE];
+        do {
+            size_t size = fread(buf, 1, BUFSIZE, stream);
+            if (ferror(stream)) {
+                return false;
+            }
+            if (!ufold_vm_feed(vm, buf, size)) {
+                return false;
+            }
+            if (has_linefeed((uint8_t*)buf, size) && !ufold_vm_flush(vm)) {
+                return false;
+            }
+        } while (!feof(stream));
+    } else {
+        char c;
+        do {
+            (void)fread(&c, 1, 1, stream);
+            if (ferror(stream)) {
+                return false;
+            }
+            if (!ufold_vm_feed(vm, &c, 1)) {
+                return false;
+            }
+            if (is_linefeed(c) && !ufold_vm_flush(vm)) {
+                return false;
+            }
+        } while (!feof(stream));
+    }
 
     return true;
 }
