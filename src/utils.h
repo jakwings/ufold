@@ -6,7 +6,7 @@
 #include "stdbool.h"
 #include "../utf8proc/utf8proc.h"
 
-#ifndef NDEBUG
+#ifdef UFOLD_DEBUG
 #include <stdio.h>
 
 #define log(fmt, ...) \

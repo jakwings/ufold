@@ -353,7 +353,7 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
 
-    if (vm->line_size > vm->max_size || has_linefeed(bytes, size)) {
+    if (vm->line_size > vm->max_size) {
         if (!vm_flush(vm)) {
             logged_return(false);
         }
@@ -390,7 +390,7 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 \*/
 static bool vm_flush(ufold_vm_t* vm)
 {
-#ifdef NDEBUG
+#ifndef UFOLD_DEBUG
     // inharmonious logic
     if (vm->config.max_width == 0) {
         // write sanitized input
@@ -456,8 +456,7 @@ static bool vm_flush(ufold_vm_t* vm)
             }
 
             if (eol_found) {
-                vm->line_size = 0;
-                vm->line_width = 0;
+                vm_line_shift(vm, size, width);
                 vm->offset = 0;
                 vm_indent_reset(vm);
 

@@ -10,10 +10,10 @@ unexport CFLAGS
 override CFLAGS := -O2 ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
                    -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH}
 
-ifndef DEBUG
-    override CFLAGS += -DNDEBUG
+ifdef DEBUG
+    override CFLAGS += -UNDEBUG -DUFOLD_DEBUG -O0 -g
 else
-    override CFLAGS += -O0 -g
+    override CFLAGS += -DNDEBUG -UUFOLD_DEBUG
 endif
 
 ifdef CHECK_LEAK
@@ -57,7 +57,7 @@ build/utils.o: src/utils.c src/utils.h src/utf8.h
 	${CC} ${CFLAGS} -c -o $@ $<
 
 build/test: tests/test.c build/ufold.a build/ufold.h
-	${CC} ${CFLAGS} -UNDEBUG -Ibuild/ -o $@ tests/test.c build/ufold.a
+	${CC} ${CFLAGS} -Ibuild/ -o $@ tests/test.c build/ufold.a
 
 build/urandom: tests/urandom.c pcg-c/src/libpcg_random.a
 	${CC} -std=c99 -Wall -pedantic -O3 -Ipcg-c/include -o $@ $^
