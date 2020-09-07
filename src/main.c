@@ -8,6 +8,7 @@
 #include "stdbool.h"
 #include "../utf8proc/utf8proc.h"
 #include "optparse.h"
+#include "utils.h"
 #include "vm.h"
 
 #define PROGRAM "ufold"
@@ -330,18 +331,21 @@ static bool wrap_input(ufold_vm_t* vm, FILE* stream)
 {
 #define BUFSIZE 4096
     char buf[BUFSIZE];
-    ssize_t size = -1;
+    do {
+        size_t size = fread(buf, 1, BUFSIZE, stream);
 
-    while ((size = fread(buf, 1, BUFSIZE, stream)) >= 0) {
+        if (ferror(stream)) {
+            return false;
+        }
         if (!ufold_vm_feed(vm, buf, size)) {
             return false;
         }
-        if (feof(stream)) {
-            break;
+        if (has_linefeed((uint8_t*)buf, size) && !ufold_vm_flush(vm)) {
+            return false;
         }
-    }
+    } while (!feof(stream));
 
-    return !ferror(stream);
+    return true;
 }
 
 int main(int argc, char** argv)
