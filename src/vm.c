@@ -254,7 +254,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
         vm->slots[n++] = *byte;
         vm->slot_used = n;
     }
-    if (n == 0) {
+    if (n <= 0) {
         return 0;
     }
 
@@ -262,15 +262,18 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
 
     assert(len <= SLOT_SIZE);
 
-    if (len > 0 && len <= n) {
-        memcpy(output, vm->slots, len);
-        vm_slot_shift(vm, len);
-        return len;
-    }
-    if (n == SLOT_SIZE) {
-        memcpy(output, vm->slots, n);
-        vm_slot_shift(vm, n);
-        return n;
+    if (len > 0) {
+        if (len <= n) {
+            memcpy(output, vm->slots, len);
+            vm_slot_shift(vm, len);
+            return len;
+        }
+        return 0;
+    } else {
+        // invalid bytes are queued before valid bytes need them
+        output[0] = vm->slots[0];
+        vm_slot_shift(vm, 1);
+        return 1;
     }
 
     return 0;
