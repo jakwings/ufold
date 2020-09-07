@@ -63,6 +63,9 @@ ______________________________________________________________________________
                 cat file1 file2 | ufold ;
 
          More to note:
+                CRLF (U+000D U+000A), CR (U+000D), LS (U+2028), PS (U+2029)
+                and NEL (U+0085) will be normalized to LF (U+000A).
+
                 When a line indent occupies no less columns than the maximum,
                 the corresponding line will not be wrapped but kept as is.
 
@@ -73,6 +76,7 @@ ______________________________________________________________________________
                 Byte sequences that are not conforming with UTF-8 encoding
                 will be filtered before output.  The flag --bytes (-b) will
                 enforce the ASCII encoding in order to sanitize the input.
+                Control-characters are always filtered.
 
   COPYRIGHT
          Copyright (c) 2018 J.W https://github.com/jakwings/ufold
@@ -80,4 +84,3 @@ ______________________________________________________________________________
          License: https://opensource.org/licenses/ISC
 
 ______________________________________________________________________________
-
