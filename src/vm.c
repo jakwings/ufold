@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -123,7 +122,7 @@ ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
     }
     vm->config = config;
 
-    assert(MAX_WIDTH >= 0);
+    debug_assert(MAX_WIDTH >= 0);
 
     // |<------------- LINE AREA ------------->|< EXTRA >|
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
@@ -246,7 +245,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 \*/
 static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
 {
-    assert(vm->slot_used < SLOT_SIZE);
+    debug_assert(vm->slot_used < SLOT_SIZE);
 
     if (byte != NULL) {
         bool ok = true;
@@ -270,11 +269,11 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
 
     size_t len = utf8_valid_length(vm->slots[0]);
 
-    assert(len <= SLOT_SIZE);
+    debug_assert(len <= SLOT_SIZE);
 
     if (len > 0) {
         if (len <= vm->slot_used) {
-            assert(len == vm->slot_used);
+            debug_assert(len == vm->slot_used);
             // NOTE: UTF-8 Normalization: U+2028, U+2029, U+0085 -> LF
             if ((len == 3 && memcmp(vm->slots, "\xE2\x80\xA8", 3) == 0) ||
                     (len == 3 && memcmp(vm->slots, "\xE2\x80\xA9", 3) == 0) ||
@@ -289,7 +288,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
         }
         return 0;
     } else {
-        assert(vm->slot_used == 1);
+        debug_assert(vm->slot_used == 1);
         // invalid bytes are queued before valid bytes need them
         output[0] = vm->slots[0];
         vm->slot_used = 0;
@@ -305,7 +304,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
 \*/
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 {
-    assert(vm->line_size >= size && vm->line_width >= width);
+    debug_assert(vm->line_size >= size && vm->line_width >= width);
 
     if (vm->line_size <= size || vm->line_width < width) {
         vm->line_size = 0;
@@ -353,8 +352,8 @@ static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
-    assert(vm->line_size <= vm->max_size);
-    assert(size <= SLOT_SIZE);
+    debug_assert(vm->line_size <= vm->max_size);
+    debug_assert(size <= SLOT_SIZE);
 
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
@@ -433,11 +432,11 @@ static bool vm_flush(ufold_vm_t* vm)
                 logged_return(false);
             }
             if (vm->line_size == 0) {
-                assert(vm->state == VM_LINE || vm->state == VM_FULL);
+                debug_assert(vm->state == VM_LINE || vm->state == VM_FULL);
                 return true;
             }
         }
-        assert(vm->line_size > 0);
+        debug_assert(vm->line_size > 0);
 
         if (vm->config.max_width == 0) {
             vm->state = VM_FULL;
@@ -484,13 +483,13 @@ static bool vm_flush(ufold_vm_t* vm)
                         &word_end, &linefeed, &end, &new_offset)) {
             logged_return(false);
         }
-        assert(new_offset >= vm->offset);
+        debug_assert(new_offset >= vm->offset);
 
         size_t size = end - vm->line;
         size_t width = new_offset - vm->offset;
 
         if (linefeed != NULL) {
-            assert(new_offset <= vm->config.max_width);
+            debug_assert(new_offset <= vm->config.max_width);
 
             if (!vm->config.write(vm->line, size)) {
                 logged_return(false);
@@ -503,7 +502,7 @@ static bool vm_flush(ufold_vm_t* vm)
             vm->state = VM_LINE;
         } else if (word_end != NULL) {
             // maximum line width exceeded and break at whitespace
-            assert(new_offset <= vm->config.max_width);
+            debug_assert(new_offset <= vm->config.max_width);
 
             size = end - vm->line;
 
@@ -569,7 +568,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 }
                 size = end - vm->line;
                 width = new_offset - vm->offset;
-                assert(size > 0 && width > 0);
+                debug_assert(size > 0 && width > 0);
 
                 if (!vm->config.write(vm->line, size)) {
                     logged_return(false);
@@ -596,7 +595,7 @@ static bool vm_indent(ufold_vm_t* vm)
 {
     // update indent, may update twice if indent is too large
     if (vm->state == VM_LINE) {
-        assert(vm->indent_width == vm->offset);
+        debug_assert(vm->indent_width == vm->offset);
 
         const uint8_t* line_end = vm->line + vm->line_size;
         const uint8_t* indent_end = vm->line;
@@ -669,7 +668,7 @@ static bool vm_indent(ufold_vm_t* vm)
             vm->offset += width;
             vm_line_shift(vm, size, width);
         } else {
-            assert(vm->line_size > 0);  // infinite loop otherwise
+            debug_assert(vm->line_size > 0);  // infinite loop otherwise
         }
 
         if (vm->indent_width >= vm->config.max_width) {
@@ -679,10 +678,10 @@ static bool vm_indent(ufold_vm_t* vm)
             vm->state = VM_WORD;
         }
     } else if (vm->state == VM_WRAP) {
-        assert(vm->indent_width == vm->offset);
+        debug_assert(vm->indent_width == vm->offset);
 
         if (vm->indent_size > 0) {
-            assert(vm->indent != NULL);
+            debug_assert(vm->indent != NULL);
 
             if (!vm->config.write(vm->indent, vm->indent_size)) {
                 logged_return(false);

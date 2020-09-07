@@ -7,7 +7,10 @@
 #include "../utf8proc/utf8proc.h"
 
 #ifdef UFOLD_DEBUG
+#include <assert.h>
 #include <stdio.h>
+
+#define debug_assert(yes) assert(yes)
 
 #define log(fmt, ...) \
     fprintf(stderr, (fmt), __VA_ARGS__)
@@ -18,6 +21,7 @@
     return (ok)
 
 #else
+#define debug_assert(yes)
 #define log(fmt, ...)
 #define logged_return(yes) return (yes)
 #endif
