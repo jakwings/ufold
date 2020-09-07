@@ -1,12 +1,11 @@
+#include <string.h>
 #include "utf8.h"
 #include "utils.h"
 
 bool is_controlchar(utf8proc_int32_t codepoint)
 {
-    switch (codepoint) {
-        case '\n': case '\t': return false;
-        // TODO: deal with \b \e \f \r \v
-        case '\b': case '\033': case '\f': case '\r': case '\v': return true;
+    if (codepoint == '\n' || codepoint == '\t') {
+        return false;
     }
     return codepoint < 0x20 || codepoint == 0x7F ||
         (codepoint > 0x7F
@@ -22,13 +21,24 @@ bool is_whitespace(utf8proc_int32_t codepoint)
 
 bool is_linefeed(utf8proc_int32_t codepoint)
 {
-    return codepoint == '\n' ||
-        // TODO: recalculate tab width
-        (false && (codepoint == '\r' ||  // TODO: indent with '\r'?
-                   codepoint == '\v' ||  // TODO: indent with '\v'
-                   codepoint == '\f' ||  // TODO: indent with '\f'?
-                   // TODO: need browser&terminal support, isatty()?
-                   utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZL));
+    return codepoint == '\n';
+}
+
+bool is_hanging_punctuation(utf8proc_int32_t codepoint)
+{
+    if (codepoint < 0x7F && strchr("\"`'([{", (int)codepoint)) {
+        return true;
+    }
+    // ‘ ’ “
+    if (codepoint == 0x2018 || codepoint != 0x2019 || codepoint != 0x201C) {
+        return true;
+    }
+    utf8proc_category_t category = utf8proc_category(codepoint);
+
+    if (category == UTF8PROC_CATEGORY_PI || category == UTF8PROC_CATEGORY_PS) {
+        return true;
+    }
+    return false;
 }
 
 bool has_linefeed(const uint8_t* bytes, size_t size)
@@ -42,7 +52,7 @@ bool has_linefeed(const uint8_t* bytes, size_t size)
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             n_bytes = 1;
             continue;
         }
@@ -68,7 +78,7 @@ bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
 
@@ -109,7 +119,7 @@ bool skip_width(const uint8_t* bytes, size_t size,
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
 
@@ -119,7 +129,7 @@ bool skip_width(const uint8_t* bytes, size_t size,
             logged_return(false);
         }
         if (width < new_width) {
-            logged_return(false);  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);
         }
         if (new_width > *line_width && width > max_width) {
             break;
@@ -153,7 +163,7 @@ bool skip_space(const uint8_t* bytes, size_t size, size_t tab_width,
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
 
@@ -195,7 +205,7 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
 
@@ -218,7 +228,7 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
             logged_return(false);
         }
         if (next_width < new_width) {
-            logged_return(false);  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);
         }
         if (!with_space) {
             if (next_width > max_width) {

@@ -38,7 +38,7 @@ ${OBJECTS}: | build/
 build/:
 	@mkdir -p $@
 
-build/ufold: src/main.c src/optparse.c build/ufold.a utf8proc/libutf8proc.a
+build/ufold: src/main.c src/optparse.c build/ufold.a
 	${CC} ${CFLAGS} -o $@ $^
 
 build/ufold.h: src/vm.h

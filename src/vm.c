@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../utf8proc/utf8proc.h"
 #include "utf8.h"
 #include "utils.h"
 #include "vm.h"
@@ -353,10 +352,8 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     memcpy(vm->line + vm->line_size, bytes, size);
     vm->line_size += size;
 
-    if (vm->line_size > vm->max_size) {
-        if (!vm_flush(vm)) {
-            logged_return(false);
-        }
+    if (vm->line_size > vm->max_size && !vm_flush(vm)) {
+        logged_return(false);
     }
 
     if (vm->line_size > vm->max_size) {
@@ -474,6 +471,7 @@ static bool vm_flush(ufold_vm_t* vm)
         const uint8_t* end = NULL;
         size_t new_offset = vm->offset;
 
+        // TODO: https://www.unicode.org/reports/tr29/#Word_Boundaries
         if (!break_line(vm->line, vm->line_size, vm->config.break_at_spaces,
                         vm->config.tab_width, vm->config.max_width,
                         &word_end, &linefeed, &end, &new_offset)) {
@@ -502,7 +500,6 @@ static bool vm_flush(ufold_vm_t* vm)
 
             size = end - vm->line;
 
-            // IDEA: keep the original behavior of fold(1), i.e. no trim?
             if (vm->config.break_at_spaces) {
                 // trailing spaces will be trimmed
                 if (!vm->config.write(vm->line, word_end - vm->line)) {
@@ -727,7 +724,6 @@ static bool skip_punctuation(const uint8_t* bytes, size_t size,
 
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;
-    utf8proc_category_t category;
 
     for (size_t i = 0; i < size; i += n_bytes) {
         n_bytes = utf8proc_iterate(bytes + i, size - i, &codepoint);
@@ -740,22 +736,11 @@ static bool skip_punctuation(const uint8_t* bytes, size_t size,
         }
 
         if (use_preset) {
-            if (!(codepoint < 0x7F && strchr("\"`'([{", (int)codepoint))
-                    // ‘ ’ “
-                    && codepoint != 0x2018
-                    && codepoint != 0x2019
-                    && codepoint != 0x201C) {
-                category = utf8proc_category(codepoint);
-                if (category != UTF8PROC_CATEGORY_PI &&
-                        category != UTF8PROC_CATEGORY_PS) {
-                    break;
-                }
+            if (!is_hanging_punctuation(codepoint)) {
+                break;
             }
         } else {
-            category = utf8proc_category(codepoint);
-            // also disallow \t
-            if (category == UTF8PROC_CATEGORY_ZS ||
-                    category == UTF8PROC_CATEGORY_CC) {
+            if (is_whitespace(codepoint) || is_controlchar(codepoint)) {
                 break;
             }
             memcpy(buf, bytes + i, n_bytes);

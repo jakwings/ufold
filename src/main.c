@@ -7,7 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 #include "stdbool.h"
-#include "../utf8proc/utf8proc.h"
 #include "optparse.h"
 #include "utils.h"
 #include "vm.h"
@@ -186,14 +185,11 @@ static bool check_punctuation(const char* bytes, size_t size)
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             return false;
         }
-        if (codepoint <= 0x20 || codepoint == 0x7F ||
-                utf8proc_category(codepoint) == UTF8PROC_CATEGORY_CC ||
-                utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS ||
-                utf8proc_charwidth(codepoint) < 0)
-        {
+        if (is_whitespace(codepoint) || is_controlchar(codepoint) ||
+                utf8proc_charwidth(codepoint) < 0) {
             return false;
         }
     }

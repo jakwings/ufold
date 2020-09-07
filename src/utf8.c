@@ -28,7 +28,7 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
 
@@ -49,11 +49,9 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
             offset += width;
             new_offset += width;
         } else {
-            // A TAB or LF right before it can void '\b', what about others?
-            logged_return(false);  // TODO: '\b' and the likes, isatty()?
+            logged_return(false);
         }
 
-        // TODO: \r \v \f
         if (is_linefeed(codepoint)) {
             offset = 0;
         }
@@ -80,14 +78,12 @@ size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
         if (n_bytes == 0) {
             break;
         }
-        if (n_bytes < 0) {
+        if (n_bytes < 0 || n_bytes > 4) {
             bytes[i] = '?';
             n_bytes = 1;
             continue;
         }
 
-        // TODO: keep control chars except \b \e \f \r \v ?
-        // TODO: strip '\b' and the likes, isatty()?
         if (is_controlchar(codepoint) || utf8proc_charwidth(codepoint) < 0) {
             memset(bytes + i, '?', n_bytes);
             continue;

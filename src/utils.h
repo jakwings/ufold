@@ -28,6 +28,8 @@ bool is_whitespace(utf8proc_int32_t codepoint);
 
 bool is_linefeed(utf8proc_int32_t codepoint);
 
+bool is_hanging_punctuation(utf8proc_int32_t codepoint);
+
 bool has_linefeed(const uint8_t* bytes, size_t size);
 
 /*\
