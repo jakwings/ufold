@@ -58,21 +58,22 @@ static bool write_to_buf(const void* s, size_t n)
         printf("[API TEST] %s ... ", #name); \
         fflush(stdout); \
         ufold_vm_t* vm = NULL; \
-        ufold_vm_config_t config = { \
-            .max_width = MAX_WIDTH, \
-            .tab_width = TAB_WIDTH, \
-            .keep_indentation = false, \
-            .break_at_spaces = false, \
-            .truncate_bytes = false, \
-            .write = write_to_buf, \
-            .realloc = NULL, \
-        }; \
+        ufold_vm_config_t config = {0}; \
+        config.write = write_to_buf; \
+        config.realloc = NULL; \
+        config.max_width = MAX_WIDTH; \
+        config.tab_width = TAB_WIDTH; \
+        config.punctuation = NULL; \
+        config.hang_punctuation = false; \
+        config.keep_indentation = false; \
+        config.break_at_spaces = false; \
+        config.truncate_bytes = false; \
         clear_buf();
 
 #define TEST_END(name) \
         free_buf(); \
         ufold_vm_free(vm); \
-        printf("Done\n"); \
+        printf("Passed\n"); \
         fflush(stdout); \
         return; \
     TEST_FAIL: \
@@ -84,7 +85,7 @@ static bool write_to_buf(const void* s, size_t n)
 
 #define expect(bytes, size) \
     do { \
-        if (!check_buf((bytes), (size))) { \
+        if (text_len != (size) || !check_buf((bytes), (size))) { \
             fprintf(stderr, "[ERROR]: unexpected output\n"); \
             fprintf(stderr, "[EXPECTED]\n"); \
             fwrite((bytes), (size), 1, stderr); \
@@ -141,10 +142,25 @@ TEST_START (indent_02)
 TEST_END (indent_02)
 
 
+TEST_START (indent_03)
+    // TODO: always check vm.max_size
+    config.max_width = 1;
+    config.keep_indentation = true;
+
+    vnew(vm, config);
+    vfeed(vm, " A\n B\n C", 8);
+    vstop(vm);
+
+    char result[] = " A\n B\n C";
+    expect(result, sizeof(result) - 1);
+TEST_END (indent_03)
+
+
 int main()
 {
     run_test(indent_01);
     run_test(indent_02);
+    run_test(indent_03);
 
     return EXIT_SUCCESS;
 }

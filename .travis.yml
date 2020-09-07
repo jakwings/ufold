@@ -2,3 +2,4 @@ language: cpp
 
 script:
   - make DEBUG=1 CHECK_LEAK=1 clean all test
+  - make CFLAGS='-Ofast -march=native' clean all test
