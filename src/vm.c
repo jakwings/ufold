@@ -197,7 +197,11 @@ bool ufold_vm_stop(ufold_vm_t* vm)
 bool ufold_vm_flush(ufold_vm_t* vm)
 {
     if (!vm->stopped) {
-        logged_return(vm_flush(vm));
+        if (!vm_flush(vm)) {
+            vm->stopped = true;
+            logged_return(false);
+        }
+        return true;
     }
     logged_return(false);
 }
