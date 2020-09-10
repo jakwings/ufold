@@ -34,8 +34,8 @@ static bool check_buf(const void* s, size_t n)
 
 static bool write_to_buf(const void* s, size_t n)
 {
-    if (buf_size < text_len + n) {
-        buf_size = buf_size + ((n > buf_size) ? n : buf_size);
+    while (buf_size < text_len + n) {
+        buf_size += (buf_size > 0 ? buf_size : 1);
         if (NULL == (buf = realloc(buf, buf_size))) {
             warn("%s", "failed to allocate memory for buffer");
             return false;
@@ -44,7 +44,6 @@ static bool write_to_buf(const void* s, size_t n)
     if (n > 0) {
         memmove(buf + text_len, s, n);
         text_len += n;
-        assert(text_len <= buf_size);
     }
     return true;
 }
@@ -86,7 +85,7 @@ static bool write_to_buf(const void* s, size_t n)
 #define expect(bytes, size) \
     do { \
         if (text_len != (size) || !check_buf((bytes), (size))) { \
-            fprintf(stderr, "[ERROR]: unexpected output\n"); \
+            fprintf(stderr, "[ERROR:%d] unexpected output\n", __LINE__); \
             fprintf(stderr, "[EXPECTED]\n"); \
             fwrite((bytes), (size), 1, stderr); \
             fprintf(stderr, "\n[/EXPECTED]\n"); \
@@ -143,7 +142,6 @@ TEST_END (indent_02)
 
 
 TEST_START (indent_03)
-    // TODO: always check vm.max_size
     config.max_width = 1;
     config.keep_indentation = true;
 
@@ -156,11 +154,32 @@ TEST_START (indent_03)
 TEST_END (indent_03)
 
 
+TEST_START (line_buffered_01)
+    config.max_width = 10;
+
+    vnew(vm, config);
+    vfeed(vm, "A\nB", 3);
+    vflush(vm);
+    expect("A\n", 2);
+    vfeed(vm, "\nC", 2);
+    vflush(vm);
+    expect("A\nB\n", 4);
+    vfeed(vm, "\xC2" "\x85" "D", 3);
+    vflush(vm);
+    expect("A\nB\nC\n", 6);
+    vstop(vm);
+
+    char result[] = "A\nB\nC\nD";
+    expect(result, sizeof(result) - 1);
+TEST_END (line_buffered_01)
+
+
 int main()
 {
     run_test(indent_01);
     run_test(indent_02);
     run_test(indent_03);
+    run_test(line_buffered_01);
 
     return EXIT_SUCCESS;
 }

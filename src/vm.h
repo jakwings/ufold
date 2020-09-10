@@ -35,13 +35,13 @@ typedef struct ufold_vm_config_struct {
  /   Create a new VM for line wrapping.
  /
  / PARAMETERS
- /   options --> VM options
+ /   config --> VM options
  /
  / RETURN
  /   BEAF :: success
  /   NULL :: failure
 \*/
-ufold_vm_t* ufold_vm_new(ufold_vm_config_t config);
+ufold_vm_t* ufold_vm_new(const ufold_vm_config_t config);
 
 /*\
  / DESCRIPTION

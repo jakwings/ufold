@@ -5,8 +5,6 @@
 #include "utils.h"
 #include "vm.h"
 
-#define SLOT_SIZE 4  // maximum length of a Unicode scalar in bytes
-
 //\ I/O State of VM
 typedef enum vm_state {
     VM_WORD,  // processing a fragment
@@ -17,21 +15,23 @@ typedef enum vm_state {
 
 //\ Virtual State Machine
 struct ufold_vm_struct {
-    // Configuration
+    //\ Configuration
     ufold_vm_config_t config;
-    // Accumulation
+    //\ Accumulation
     uint8_t* line;
+    size_t line_size;
+    size_t line_width;  // only updated when needed (in order to save time)
     size_t max_size;  // capacity of line buffer (excluding extra area)
-    uint8_t slots[SLOT_SIZE];
+    size_t offset;  // (width) if buffer start is not at line start
+#define SLOT_SIZE 256
+    uint8_t* slots;
     size_t slot_used;
+    size_t slot_cursor;  // position of validation
     uint8_t* indent;
     size_t indent_size;
     size_t indent_width;
     size_t indent_bufsize;
-    size_t offset;  // (width) if buffer start is not at line start
-    size_t line_size;
-    size_t line_width;  // only updated when needed (in order to save time)
-    // Switches
+    //\ Switches
     vm_state_t state;
     bool slot_crlf;  // whether the previously processed codepoint is CR
     bool indent_hanging;  // hanging punctuation
@@ -47,7 +47,9 @@ static void* vm_realloc(ufold_vm_t* vm, void* ptr, size_t size);
 
 static void vm_free(ufold_vm_t* vm, void* ptr);
 
-static bool vm_slot(ufold_vm_t* vm, const uint8_t* byte);
+static size_t vm_slot(ufold_vm_t* vm, uint8_t byte);
+
+static void vm_slot_shift(ufold_vm_t* vm, size_t n);
 
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width);
 
@@ -105,58 +107,72 @@ static void vm_free(ufold_vm_t* vm, void* ptr)
     vm->config.realloc(ptr, 0);
 }
 
-ufold_vm_t* ufold_vm_new(ufold_vm_config_t config)
+ufold_vm_t* ufold_vm_new(const ufold_vm_config_t config)
 {
-    if (config.write == NULL) {
-        config.write = default_write;
-    }
-    if (config.realloc == NULL) {
-        config.realloc = default_realloc;
-    }
-
-    ufold_vm_t* vm = config.realloc(NULL, sizeof(ufold_vm_t));
-
-    if (vm == NULL) {
-        // TODO: inform error type?
-        return NULL;
-    }
-    vm->config = config;
-
     debug_assert(MAX_WIDTH >= 0);
+    debug_assert(SLOT_SIZE >= 4);
 
     // |<------------- LINE AREA ------------->|< EXTRA >|
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
     size_t width = (config.max_width > 0) ? config.max_width : MAX_WIDTH;
     // check overflow
     if (sizeof(uint8_t) <= 0 || SIZE_MAX / width / 4 < sizeof(uint8_t)) {
-        vm_free(vm, vm);
         return NULL;
     }
     size_t size = sizeof(uint8_t) * 4 * width + SLOT_SIZE;
     // check overflow
     if (size < sizeof(uint8_t) * 4 * width) {
-        vm_free(vm, vm);
         return NULL;
     }
 
-    vm->line = config.realloc(NULL, size);
+    ufold_vm_config_t conf = config;
 
-    if (vm->line == NULL) {
-        vm_free(vm, vm);
+    if (conf.write == NULL) {
+        conf.write = default_write;
+    }
+    if (conf.realloc == NULL) {
+        conf.realloc = default_realloc;
+    }
+
+    ufold_vm_t* vm = conf.realloc(NULL, sizeof(ufold_vm_t));
+
+    if (vm == NULL) {
+        // TODO: inform error type?
         return NULL;
     }
+    memset(vm, 0, sizeof(ufold_vm_t));
+
+    vm->config = conf;
+
+#ifndef UFOLD_DEBUG
+    // inharmonious logic
+    if (conf.max_width != 0) {
+#endif
+        if ((vm->line = conf.realloc(NULL, size)) == NULL) {
+            ufold_vm_free(vm);
+            return NULL;
+        }
+#ifndef UFOLD_DEBUG
+    }
+#endif
+
+    if ((vm->slots = conf.realloc(NULL, SLOT_SIZE)) == NULL) {
+        ufold_vm_free(vm);
+        return NULL;
+    }
+
+    vm->line_size = 0;
+    vm->line_width = 0;
     vm->max_size = size - SLOT_SIZE;
-
+    vm->offset = 0;
     vm->slot_used = 0;
+    vm->slot_cursor = 0;
     vm->slot_crlf = false;
     vm->indent = NULL;
     vm->indent_size = 0;
     vm->indent_width = 0;
     vm->indent_bufsize = 0;
     vm->indent_hanging = false;
-    vm->offset = 0;
-    vm->line_size = 0;
-    vm->line_width = 0;
     vm->state = VM_LINE;
     vm->stopped = false;
 
@@ -167,6 +183,7 @@ void ufold_vm_free(ufold_vm_t* vm)
 {
     if (vm != NULL) {
         vm_free(vm, vm->line);
+        vm_free(vm, vm->slots);
         vm_free(vm, vm->indent);
         vm_free(vm, vm);
     }
@@ -178,14 +195,17 @@ bool ufold_vm_stop(ufold_vm_t* vm)
         vm->stopped = true;
 
         if (vm->slot_used > 0) {
-            // sanitize incomplete byte sequence
-            vm->slot_used = utf8_sanitize(vm->slots, vm->slot_used,
-                                          vm->config.truncate_bytes);
+            debug_assert(vm->slot_cursor <= vm->slot_used);
+            debug_assert(vm->slot_used - vm->slot_cursor <= 4);
+            // sanitize invalid/incomplete byte sequence
+            size_t n = utf8_sanitize(vm->slots, vm->slot_used,
+                                     vm->config.truncate_bytes);
 
-            if (!vm_feed(vm, vm->slots, vm->slot_used)) {
+            if (!vm_feed(vm, vm->slots, n)) {
                 logged_return(false);
             }
-            vm->slot_used = 0;
+            vm->slot_cursor = vm->slot_used;
+            vm_slot_shift(vm, vm->slot_used);
         }
         if (!vm_flush(vm)) {
             logged_return(false);
@@ -213,17 +233,17 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
     }
     // TODO: provide a fast path for ASCII mode
 
-    for (size_t i = 0; i < size; i++) {
-        if (vm_slot(vm, (const uint8_t*)bytes + i)) {
+    for (size_t i = 0; i < size; ++i) {
+        size_t n = vm_slot(vm, ((const uint8_t*)bytes)[i]);
+        if (n > 0) {
             // TODO: new option for interpreting ANSI color codes
-            vm->slot_used = utf8_sanitize(vm->slots, vm->slot_used,
-                                          vm->config.truncate_bytes);
+            size_t k = utf8_sanitize(vm->slots, n, vm->config.truncate_bytes);
 
-            if (!vm_feed(vm, vm->slots, vm->slot_used)) {
+            if (!vm_feed(vm, vm->slots, k)) {
                 vm->stopped = true;
                 logged_return(false);
             }
-            vm->slot_used = 0;
+            vm_slot_shift(vm, n);
         }
     }
 
@@ -232,64 +252,117 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
 
 /*\
  / DESCRIPTION
- /   Push a byte into the available slots and pop a useful byte sequence.
+ /   Push bytes into the available slots and pull back a valid byte sequence.
  /   A potentially well-formed UTF-8 byte sequence is not useful yet.
  /
- / PARAMETERS
- /   *byte --> optional input
- /
  / RETURN
- /    true :: success, bytes in slots are ready to use
- /   false :: queuing, retry later
+ /   N :: N bytes in slots are ready for use
+ /   0 :: queuing, retry later
 \*/
-static bool vm_slot(ufold_vm_t* vm, const uint8_t* byte)
+static size_t vm_slot(ufold_vm_t* vm, uint8_t byte)
 {
     debug_assert(vm->slot_used < SLOT_SIZE);
+    debug_assert(vm->slot_cursor <= vm->slot_used);
 
-    if (byte != NULL) {
-        bool ok = true;
-        uint8_t c = *byte;
+    uint8_t c = byte;
 
-        // NOTE: ASCII Normalization: CRLF, CR -> LF
-        if (c == '\r') {
-            vm->slot_crlf = true;
-            c = '\n';
-        } else {
-            ok = !(c == '\n' && vm->slot_crlf);
-            vm->slot_crlf = false;
-        }
-        if (ok) {
-            vm->slots[vm->slot_used++] = c;
-        }
-    }
-    if (vm->slot_used <= 0) {
-        return false;
-    }
-
-    size_t len = utf8_valid_length(vm->slots[0]);
-
-    debug_assert(len <= SLOT_SIZE);
-
-    if (len > 0) {
-        if (len <= vm->slot_used) {
-            debug_assert(len == vm->slot_used);
-            // NOTE: UTF-8 Normalization: U+2028, U+2029, U+0085 -> LF
-            if ((len == 3 && memcmp(vm->slots, "\xE2\x80\xA8", 3) == 0) ||
-                    (len == 3 && memcmp(vm->slots, "\xE2\x80\xA9", 3) == 0) ||
-                    (len == 2 && memcmp(vm->slots, "\xC2\x85", 2) == 0)) {
-                vm->slots[0] = '\n';
-                vm->slot_used = 1;
-            }
-            return true;
-        }
-        return false;
+    // NOTE: ASCII Normalization: CRLF, CR -> LF
+    if (c == '\r') {
+        vm->slot_crlf = true;
+        c = '\n';
     } else {
-        debug_assert(vm->slot_used == 1);
-        // invalid bytes are queued before valid bytes need them
-        return true;
+        bool crlf_combined = (c == '\n' && vm->slot_crlf);
+
+        vm->slot_crlf = false;
+
+        if (crlf_combined) {
+            return 0;
+        }
+    }
+    vm->slots[vm->slot_used++] = c;
+
+    // ASCII fast path
+    if (vm->config.truncate_bytes) {
+        debug_assert(vm->slot_cursor + 1 == vm->slot_used);
+
+        vm->slot_cursor += 1;
+
+        // support line-buffered output
+        if (is_linefeed(c)) {
+            return vm->slot_cursor;
+        }
+        return vm->slot_used == SLOT_SIZE ? vm->slot_cursor : 0;
     }
 
-    return false;
+    while (vm->slot_cursor < vm->slot_used) {
+        size_t k = utf8_valid_length(vm->slots[vm->slot_cursor]);
+
+        if (k <= 0) {
+            // skip an invalid starting byte
+            vm->slot_cursor += 1;
+            continue;
+        }
+        if (k > vm->slot_used - vm->slot_cursor) {
+            // found an incomplete sequence; need the rest bytes
+            break;
+        }
+
+        utf8proc_int32_t codepoint = -1;
+        utf8proc_ssize_t n_bytes = -1;
+
+        n_bytes = utf8proc_iterate(vm->slots + vm->slot_cursor, k, &codepoint);
+        debug_assert(n_bytes != 0);
+        debug_assert(n_bytes <= 4);
+
+        if (n_bytes < 0) {
+            // skip an invalid starting byte of an invalid sequence
+            vm->slot_cursor += 1;
+        } else {
+            debug_assert(k == n_bytes);
+            // NOTE: UTF-8 Normalization: U+2028, U+2029, U+0085 -> LF
+            if (codepoint == 0x2028 || codepoint == 0x2029 ||
+                    codepoint == 0x0085) {
+                uint8_t* p = vm->slots + vm->slot_cursor;
+                size_t remains = vm->slot_used - vm->slot_cursor;
+
+                memmove(p, p + n_bytes, remains - n_bytes);
+                *p = '\n';
+                vm->slot_used -= n_bytes - 1;
+                vm->slot_cursor += 1;
+
+                // support line-buffered output
+                return vm->slot_cursor;
+            } else {
+                vm->slot_cursor += n_bytes;
+
+                // support line-buffered output
+                if (is_linefeed(codepoint)) {
+                    return vm->slot_cursor;
+                }
+            }
+        }
+    }
+
+    return vm->slot_used == SLOT_SIZE ? vm->slot_cursor : 0;
+}
+
+/*\
+ / DESCRIPTION
+ /   Shift the VM's buffer queuing slots by N places.
+\*/
+static void vm_slot_shift(ufold_vm_t* vm, size_t n)
+{
+    debug_assert(vm->slot_used >= n);
+    debug_assert(vm->slot_cursor >= n);
+
+    if (vm->slot_used <= n) {
+        vm->slot_used = 0;
+        vm->slot_cursor = 0;
+    } else {
+        memmove(vm->slots, vm->slots + n, vm->slot_used - n);
+        vm->slot_used -= n;
+        vm->slot_cursor -= n;
+    }
 }
 
 /*\
@@ -298,7 +371,8 @@ static bool vm_slot(ufold_vm_t* vm, const uint8_t* byte)
 \*/
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 {
-    debug_assert(vm->line_size >= size && vm->line_width >= width);
+    debug_assert(vm->line_size >= size);
+    debug_assert(vm->line_width >= width);
 
     if (vm->line_size <= size || vm->line_width < width) {
         vm->line_size = 0;
@@ -317,7 +391,7 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
 static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 {
     if (need_tab) {
-        for (size_t i = 0, j = vm->line_size; i < j; i++) {
+        for (size_t i = 0, j = vm->line_size; i < j; ++i) {
             uint8_t c = vm->line[i];
 
             if (is_linefeed(c)) {
@@ -346,6 +420,16 @@ static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
 \*/
 static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
 {
+#ifndef UFOLD_DEBUG
+    // inharmonious logic
+    if (vm->config.max_width == 0) {
+        // write sanitized input
+        if (size > 0 && !vm->config.write(bytes, size)) {
+            logged_return(false);
+        }
+        return true;
+    }
+#endif
     debug_assert(vm->line_size <= vm->max_size);
     debug_assert(size <= SLOT_SIZE);
 
@@ -392,11 +476,6 @@ static bool vm_flush(ufold_vm_t* vm)
 #ifndef UFOLD_DEBUG
     // inharmonious logic
     if (vm->config.max_width == 0) {
-        // write sanitized input
-        if (vm->line_size > 0 && !vm->config.write(vm->line, vm->line_size)) {
-            logged_return(false);
-        }
-        vm->line_size = 0;
         return true;
     }
 #endif
@@ -564,7 +643,8 @@ static bool vm_flush(ufold_vm_t* vm)
                 }
                 size = end - vm->line;
                 width = new_offset - vm->offset;
-                debug_assert(size > 0 && width > 0);
+                debug_assert(size > 0);
+                debug_assert(width > 0);
 
                 if (!vm->config.write(vm->line, size)) {
                     logged_return(false);

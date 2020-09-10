@@ -15,7 +15,8 @@ bool is_controlchar(utf8proc_int32_t codepoint)
 bool is_whitespace(utf8proc_int32_t codepoint)
 {
     return codepoint == ' ' || codepoint == '\t' ||
-        (!is_linefeed(codepoint)
+        (codepoint > 0x7F
+         && !is_linefeed(codepoint)
          // TODO?
          //&& codepoint != 0xA0    // [ZS] NO-BREAK SPACE
          //&& codepoint != 0x202F  // [ZS] NARROW NO-BREAK SPACE
@@ -29,13 +30,19 @@ bool is_linefeed(utf8proc_int32_t codepoint)
 
 bool is_hanging_punctuation(utf8proc_int32_t codepoint)
 {
-    if (codepoint < 0x7F && codepoint > 0 && strchr("\"`'([{", (int)codepoint)) {
-        return true;
+    if (codepoint <= 0x7F) {
+        const char punct[] = "\"`'([{";
+
+        if (memchr(punct, (int)codepoint, sizeof(punct) - 1) != NULL) {
+            return true;
+        }
+        return false;
     }
     // ‘ ’ “
     if (codepoint == 0x2018 || codepoint != 0x2019 || codepoint != 0x201C) {
         return true;
     }
+
     utf8proc_category_t category = utf8proc_category(codepoint);
 
     if (category == UTF8PROC_CATEGORY_PI || category == UTF8PROC_CATEGORY_PS) {
@@ -46,6 +53,9 @@ bool is_hanging_punctuation(utf8proc_int32_t codepoint)
 
 bool has_linefeed(const uint8_t* bytes, size_t size)
 {
+#ifndef UFOLD_DEBUG
+    return memchr(bytes, '\n', size) != NULL;
+#else
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;
 
@@ -64,6 +74,7 @@ bool has_linefeed(const uint8_t* bytes, size_t size)
         }
     }
     return false;
+#endif
 }
 
 bool find_eol(const uint8_t* bytes, size_t size, size_t tab_width,

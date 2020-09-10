@@ -161,7 +161,7 @@ static bool parse_integer(const char* str, size_t* num)
     size_t n = 0;
     size_t k = 0;
 
-    for (const char* p = str; *p != '\0'; p++) {
+    for (const char* p = str; *p != '\0'; ++p) {
         if (!('0' <= *p && *p <= '9')) {
             return false;
         }
@@ -403,7 +403,7 @@ int main(int argc, char** argv)
     }
 
     if (argc > 0) {
-        for (int i = 0; i < argc; i++) {
+        for (int i = 0; i < argc; ++i) {
             if ((stream = fopen(argv[i], "rb")) == NULL) {
                 warn("failed to open \"%s\"", argv[i]);
                 goto FAIL;

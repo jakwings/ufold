@@ -60,18 +60,24 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
     return true;
 }
 
+uint8_t ascii_sanitize(uint8_t byte)
+{
+    return !(byte > 0x7F || is_controlchar(byte)) ? byte : '?';
+}
+
 size_t utf8_sanitize(uint8_t* bytes, size_t size, bool ascii)
 {
+    if (ascii) {
+        for (size_t i = 0; i < size; ++i) {
+            bytes[i] = ascii_sanitize(bytes[i]);
+        }
+        return size;
+    }
+
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;
 
     for (size_t i = 0; i < size; i += n_bytes) {
-        if ((ascii && bytes[i] > 0x7F) || utf8_valid_length(bytes[i]) == 0) {
-            bytes[i] = '?';
-            n_bytes = 1;
-            continue;
-        }
-
         // NOTE: surrogates are invalid
         n_bytes = utf8proc_iterate(bytes + i, size - i, &codepoint);
 

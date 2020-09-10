@@ -32,6 +32,18 @@ bool utf8_calc_width(const uint8_t* bytes, size_t size, size_t tab_width,
 
 /*\
  / DESCRIPTION
+ /   Sanitize the byte per ASCII.
+ /
+ / PARAMETERS
+ /   byte <-> unchecked byte
+ /
+ / RETURN
+ /   byte :: a good byte
+\*/
+uint8_t ascii_sanitize(uint8_t byte);
+
+/*\
+ / DESCRIPTION
  /   Sanitize the buffer in place for valid UTF-8 byte sequence.
  /
  / PARAMETERS
