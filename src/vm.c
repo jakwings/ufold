@@ -47,7 +47,7 @@ static void* vm_realloc(ufold_vm_t* vm, void* ptr, size_t size);
 
 static void vm_free(ufold_vm_t* vm, void* ptr);
 
-static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output);
+static bool vm_slot(ufold_vm_t* vm, const uint8_t* byte);
 
 static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width);
 
@@ -178,6 +178,7 @@ bool ufold_vm_stop(ufold_vm_t* vm)
         vm->stopped = true;
 
         if (vm->slot_used > 0) {
+            // sanitize incomplete byte sequence
             vm->slot_used = utf8_sanitize(vm->slots, vm->slot_used,
                                           vm->config.truncate_bytes);
 
@@ -209,22 +210,17 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
     // TODO: provide a fast path for ASCII mode
 
     for (size_t i = 0; i < size; i++) {
-        const uint8_t* input = (const uint8_t*)bytes + i;
-        size_t n = 0;
-
-        do {
-            uint8_t output[SLOT_SIZE];
-
-            n = vm_slot(vm, input, output);
+        if (vm_slot(vm, (const uint8_t*)bytes + i)) {
             // TODO: new option for interpreting ANSI color codes
-            n = utf8_sanitize(output, n, vm->config.truncate_bytes);
-            input = NULL;
+            vm->slot_used = utf8_sanitize(vm->slots, vm->slot_used,
+                                          vm->config.truncate_bytes);
 
-            if (n > 0 && !vm_feed(vm, output, n)) {
+            if (!vm_feed(vm, vm->slots, vm->slot_used)) {
                 vm->stopped = true;
                 logged_return(false);
             }
-        } while (n > 0);
+            vm->slot_used = 0;
+        }
     }
 
     return true;
@@ -236,14 +232,13 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
  /   A potentially well-formed UTF-8 byte sequence is not useful yet.
  /
  / PARAMETERS
- /    *byte --> optional input
- /   output <-- (1 to SLOT_SIZE) valid bytes after simple filtering
+ /   *byte --> optional input
  /
  / RETURN
- /   + :: success, size of output
- /   0 :: queuing, retry later
+ /    true :: success, bytes in slots are ready to use
+ /   false :: queuing, retry later
 \*/
-static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
+static bool vm_slot(ufold_vm_t* vm, const uint8_t* byte)
 {
     debug_assert(vm->slot_used < SLOT_SIZE);
 
@@ -264,7 +259,7 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
         }
     }
     if (vm->slot_used <= 0) {
-        return 0;
+        return false;
     }
 
     size_t len = utf8_valid_length(vm->slots[0]);
@@ -278,24 +273,19 @@ static size_t vm_slot(ufold_vm_t* vm, const uint8_t* byte, uint8_t* output)
             if ((len == 3 && memcmp(vm->slots, "\xE2\x80\xA8", 3) == 0) ||
                     (len == 3 && memcmp(vm->slots, "\xE2\x80\xA9", 3) == 0) ||
                     (len == 2 && memcmp(vm->slots, "\xC2\x85", 2) == 0)) {
-                output[0] = '\n';
-                vm->slot_used = 0;
-                return 1;
+                vm->slots[0] = '\n';
+                vm->slot_used = 1;
             }
-            memcpy(output, vm->slots, len);
-            vm->slot_used = 0;
-            return len;
+            return true;
         }
-        return 0;
+        return false;
     } else {
         debug_assert(vm->slot_used == 1);
         // invalid bytes are queued before valid bytes need them
-        output[0] = vm->slots[0];
-        vm->slot_used = 0;
-        return 1;
+        return true;
     }
 
-    return 0;
+    return false;
 }
 
 /*\
@@ -355,33 +345,35 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
     debug_assert(vm->line_size <= vm->max_size);
     debug_assert(size <= SLOT_SIZE);
 
-    memcpy(vm->line + vm->line_size, bytes, size);
-    vm->line_size += size;
+    if (size > 0) {
+        memcpy(vm->line + vm->line_size, bytes, size);
+        vm->line_size += size;
 
-    if (vm->line_size > vm->max_size && !vm_flush(vm)) {
-        logged_return(false);
-    }
-
-    if (vm->line_size > vm->max_size) {
-        // may be looking for the word boundary
-        size_t max_size = vm->line_size + SLOT_SIZE;
-        // check overflow
-        if (max_size < vm->line_size) {
+        if (vm->line_size > vm->max_size && !vm_flush(vm)) {
             logged_return(false);
         }
-        // LINE AREA + OVERFLOW AREA
-        size_t buf_size = max_size + SLOT_SIZE;
-        // check overflow
-        if (buf_size < max_size) {
-            logged_return(false);
-        }
-        uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
 
-        if (buf == NULL) {
-            logged_return(false);
+        if (vm->line_size > vm->max_size) {
+            // may be looking for the word boundary
+            size_t max_size = vm->line_size + SLOT_SIZE;
+            // check overflow
+            if (max_size < vm->line_size) {
+                logged_return(false);
+            }
+            // LINE AREA + OVERFLOW AREA
+            size_t buf_size = max_size + SLOT_SIZE;
+            // check overflow
+            if (buf_size < max_size) {
+                logged_return(false);
+            }
+            uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
+
+            if (buf == NULL) {
+                logged_return(false);
+            }
+            vm->line = buf;
+            vm->max_size = max_size;
         }
-        vm->line = buf;
-        vm->max_size = max_size;
     }
 
     return true;

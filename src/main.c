@@ -350,7 +350,9 @@ static bool wrap_input(ufold_vm_t* vm, FILE* stream)
     } else {
         char c;
         do {
-            (void)fread(&c, 1, 1, stream);
+            size_t n = fread(&c, 1, 1, stream);
+            (void)n;
+
             if (ferror(stream)) {
                 return false;
             }

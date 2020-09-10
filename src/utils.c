@@ -4,7 +4,7 @@
 
 bool is_controlchar(utf8proc_int32_t codepoint)
 {
-    if (codepoint == '\n' || codepoint == '\t') {
+    if (codepoint == '\n' || codepoint == '\t' || is_linefeed(codepoint)) {
         return false;
     }
     return codepoint < 0x20 || codepoint == 0x7F ||
@@ -15,8 +15,11 @@ bool is_controlchar(utf8proc_int32_t codepoint)
 bool is_whitespace(utf8proc_int32_t codepoint)
 {
     return codepoint == ' ' || codepoint == '\t' ||
-        (utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS
-         && !is_linefeed(codepoint));
+        (!is_linefeed(codepoint)
+         // TODO?
+         //&& codepoint != 0xA0    // [ZS] NO-BREAK SPACE
+         //&& codepoint != 0x202F  // [ZS] NARROW NO-BREAK SPACE
+         && utf8proc_category(codepoint) == UTF8PROC_CATEGORY_ZS);
 }
 
 bool is_linefeed(utf8proc_int32_t codepoint)
