@@ -7,6 +7,7 @@
 #include "../utf8proc/utf8proc.h"
 
 #ifdef UFOLD_DEBUG
+#undef NDEBUG
 #include <assert.h>
 #include <stdio.h>
 
