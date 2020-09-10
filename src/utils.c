@@ -29,7 +29,7 @@ bool is_linefeed(utf8proc_int32_t codepoint)
 
 bool is_hanging_punctuation(utf8proc_int32_t codepoint)
 {
-    if (codepoint < 0x7F && strchr("\"`'([{", (int)codepoint)) {
+    if (codepoint < 0x7F && codepoint > 0 && strchr("\"`'([{", (int)codepoint)) {
         return true;
     }
     // ‘ ’ “
