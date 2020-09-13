@@ -18,6 +18,8 @@ struct ufold_vm_struct {
     //\ Configuration
     ufold_vm_config_t config;
     //\ Accumulation
+    uint8_t* buf;
+    size_t buf_size;
     uint8_t* line;
     size_t line_size;
     size_t line_width;  // only updated when needed (in order to save time)
@@ -159,26 +161,28 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
         }
     }
 
-#ifndef UFOLD_DEBUG
-    // inharmonious logic
-    if (conf.max_width != 0) {
-#endif
-        if ((vm->line = conf.realloc(NULL, size)) == NULL) {
-            ufold_vm_free(vm);
-            return NULL;
-        }
-#ifndef UFOLD_DEBUG
-    }
-#endif
-
     if ((vm->slots = conf.realloc(NULL, SLOT_SIZE)) == NULL) {
         ufold_vm_free(vm);
         return NULL;
     }
 
+#ifndef UFOLD_DEBUG
+    // inharmonious logic
+    if (conf.max_width != 0) {
+#endif
+        if ((vm->buf = conf.realloc(NULL, size)) == NULL) {
+            ufold_vm_free(vm);
+            return NULL;
+        }
+        vm->line = vm->buf;
+        vm->buf_size = size;
+#ifndef UFOLD_DEBUG
+    }
+#endif
+
     vm->line_size = 0;
     vm->line_width = 0;
-    vm->max_size = size - SLOT_SIZE;
+    vm->max_size = vm->buf_size - SLOT_SIZE;
     vm->offset = 0;
     vm->slot_used = 0;
     vm->slot_cursor = 0;
@@ -198,7 +202,7 @@ void ufold_vm_free(ufold_vm_t* vm)
 {
     if (vm != NULL) {
         vm_free(vm, vm->config.punctuation);
-        vm_free(vm, vm->line);
+        vm_free(vm, vm->buf);
         vm_free(vm, vm->slots);
         vm_free(vm, vm->indent);
         vm_free(vm, vm);
@@ -389,11 +393,18 @@ static void vm_line_shift(ufold_vm_t* vm, size_t size, size_t width)
     debug_assert(vm->line_size >= size);
     debug_assert(vm->line_width >= width);
 
-    if (vm->line_size <= size || vm->line_width < width) {
+    if (vm->line_size <= size) {
+        vm->line = vm->buf;
         vm->line_size = 0;
         vm->line_width = 0;
+        vm->max_size = vm->buf_size - SLOT_SIZE;
     } else {
-        memmove(vm->line, vm->line + size, vm->line_size - size);
+        if (vm->max_size > size) {
+            vm->max_size -= size;
+        } else {
+            vm->max_size = 0;
+        }
+        vm->line += size;
         vm->line_size -= size;
         vm->line_width -= width;
     }
@@ -456,26 +467,30 @@ static bool vm_feed(ufold_vm_t* vm, const uint8_t* bytes, const size_t size)
             logged_return(false);
         }
 
+        // may be looking for the word boundary
         if (vm->line_size > vm->max_size) {
-            // may be looking for the word boundary
-            size_t max_size = vm->line_size + SLOT_SIZE;
-            // check overflow
-            if (max_size < vm->line_size) {
-                logged_return(false);
-            }
-            // LINE AREA + OVERFLOW AREA
-            size_t buf_size = max_size + SLOT_SIZE;
-            // check overflow
-            if (buf_size < max_size) {
-                logged_return(false);
-            }
-            uint8_t* buf = vm_realloc(vm, vm->line, buf_size);
+            if (vm->line_size > vm->buf_size - SLOT_SIZE) {
+                // LINE AREA + OVERFLOW AREA
+                size_t buf_size = vm->buf_size + SLOT_SIZE;
+                // check overflow
+                if (buf_size < vm->buf_size) {
+                    logged_return(false);
+                }
+                size_t offset = vm->line - vm->buf;
+                uint8_t* buf = vm_realloc(vm, vm->buf, buf_size);
 
-            if (buf == NULL) {
-                logged_return(false);
+                if (buf == NULL) {
+                    logged_return(false);
+                }
+                vm->buf = buf;
+                vm->line = buf + offset;
+                vm->buf_size = buf_size;
+                vm->max_size = buf_size - SLOT_SIZE - offset;
+            } else {
+                memmove(vm->buf, vm->line, vm->line_size);
+                vm->line = vm->buf;
+                vm->max_size = vm->buf_size - SLOT_SIZE;
             }
-            vm->line = buf;
-            vm->max_size = max_size;
         }
     }
 
