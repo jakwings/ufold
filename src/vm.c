@@ -107,16 +107,20 @@ static void vm_free(ufold_vm_t* vm, void* ptr)
     vm->config.realloc(ptr, 0);
 }
 
-ufold_vm_t* ufold_vm_new(const ufold_vm_config_t config)
+void ufold_vm_config_init(ufold_vm_config_t* config)
 {
-    debug_assert(MAX_WIDTH >= 0);
+    memset(config, 0, sizeof(ufold_vm_config_t));
+}
+
+ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
+{
     debug_assert(SLOT_SIZE >= 4);
 
     // |<------------- LINE AREA ------------->|< EXTRA >|
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPED]
-    size_t width = (config.max_width > 0) ? config.max_width : MAX_WIDTH;
+    size_t width = (config->max_width > 0) ? config->max_width : 0;
     // check overflow
-    if (sizeof(uint8_t) <= 0 || SIZE_MAX / width / 4 < sizeof(uint8_t)) {
+    if (width > 0 && SIZE_MAX / width / 4 < sizeof(uint8_t)) {
         return NULL;
     }
     size_t size = sizeof(uint8_t) * 4 * width + SLOT_SIZE;
@@ -125,7 +129,7 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t config)
         return NULL;
     }
 
-    ufold_vm_config_t conf = config;
+    ufold_vm_config_t conf = *config;
 
     if (conf.write == NULL) {
         conf.write = default_write;

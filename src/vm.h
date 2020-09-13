@@ -8,9 +8,6 @@
 //\ Virtual State Machine
 typedef struct ufold_vm_struct ufold_vm_t;
 
-//\ VM Options
-typedef struct ufold_vm_options_struct ufold_vm_options_t;
-
 //\ Writer for Output
 typedef bool (*ufold_vm_write_t)(const void* ptr, size_t size);
 
@@ -33,16 +30,25 @@ typedef struct ufold_vm_config_struct {
 
 /*\
  / DESCRIPTION
+ /   Reset the settings' value to a normal state.
+ /
+ / PARAMETERS
+ /   *config --> VM settings
+\*/
+void ufold_vm_config_init(ufold_vm_config_t* config);
+
+/*\
+ / DESCRIPTION
  /   Create a new VM for line wrapping.
  /
  / PARAMETERS
- /   config --> VM options
+ /   *config --> VM settings
  /
  / RETURN
  /   BEAF :: success
  /   NULL :: failure
 \*/
-ufold_vm_t* ufold_vm_new(const ufold_vm_config_t config);
+ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config);
 
 /*\
  / DESCRIPTION

@@ -11,14 +11,22 @@
 #include "utils.h"
 #include "vm.h"
 
+#define warn(fmt, ...) fprintf(stderr, "%s " fmt "\n", "[ERROR]", __VA_ARGS__)
+
+#ifndef MAX_WIDTH
+#define MAX_WIDTH 78
+#endif
+
+#ifndef TAB_WIDTH
+#define TAB_WIDTH 8
+#endif
+
 #define PROGRAM "ufold"
 #define VERSION "1.0.0-tau (Unicode 13.0.0)"
 
 #define COPYRIGHT "Copyright (c) 2018 J.W https://github.com/jakwings/ufold"
 #define LICENSE "License: https://opensource.org/licenses/ISC"
 #define ISSUES "https://github.com/jakwings/ufold/issues"
-
-#define warn(fmt, ...) fprintf(stderr, "%s " fmt "\n", "[ERROR]", __VA_ARGS__)
 
 #define P PROGRAM
 
@@ -137,7 +145,7 @@ static bool write_to_stderr(const void* s, size_t n)
 
 static bool vwrite(const void* s, size_t n, ufold_vm_config_t config)
 {
-    ufold_vm_t* vm = ufold_vm_new(config);
+    ufold_vm_t* vm = ufold_vm_new(&config);
 
     if (vm == NULL || !ufold_vm_feed(vm, s, n) || !ufold_vm_stop(vm)) {
         if (errno != 0) {
@@ -375,18 +383,19 @@ int main(int argc, char** argv)
     }
     int exitcode = EXIT_SUCCESS;
 
-    ufold_vm_config_t config = {
-        .max_width = MAX_WIDTH,
-        .tab_width = TAB_WIDTH,
-        .punctuation = NULL,
-        .hang_punctuation = false,
-        .keep_indentation = false,
-        .break_at_spaces = false,
-        .ascii_mode = false,
-        .line_buffered = true,
-        .write = NULL,
-        .realloc = NULL,
-    };
+    ufold_vm_config_t config;
+    ufold_vm_config_init(&config);
+
+    config.max_width = MAX_WIDTH;
+    config.tab_width = TAB_WIDTH;
+    config.punctuation = NULL;
+    config.hang_punctuation = false;
+    config.keep_indentation = false;
+    config.break_at_spaces = false;
+    config.ascii_mode = false;
+    config.line_buffered = true;
+    config.write = NULL;
+    config.realloc = NULL;
 
     if (!parse_options(&argc, &argv, &config)) {
         fputc('\n', stderr);
@@ -394,7 +403,7 @@ int main(int argc, char** argv)
     }
 
     FILE* stream = stdin;
-    ufold_vm_t* vm = ufold_vm_new(config);
+    ufold_vm_t* vm = ufold_vm_new(&config);
 
     if (vm == NULL) {
         warn("%s", "failed to create vm");

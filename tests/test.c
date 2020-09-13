@@ -10,6 +10,14 @@
 
 #define warn(fmt, ...) fprintf(stderr, "[ERROR]: " fmt "\n", __VA_ARGS__)
 
+#ifndef MAX_WIDTH
+#define MAX_WIDTH 78
+#endif
+
+#ifndef TAB_WIDTH
+#define TAB_WIDTH 8
+#endif
+
 static uint8_t* buf = NULL;
 static size_t buf_size = 0;
 static size_t text_len = 0;
@@ -57,7 +65,8 @@ static bool write_to_buf(const void* s, size_t n)
         printf("[API TEST] %s ... ", #name); \
         fflush(stdout); \
         ufold_vm_t* vm = NULL; \
-        ufold_vm_config_t config = {0}; \
+        ufold_vm_config_t config; \
+        ufold_vm_config_init(&config); \
         config.write = write_to_buf; \
         config.realloc = NULL; \
         config.max_width = MAX_WIDTH; \
@@ -98,7 +107,7 @@ static bool write_to_buf(const void* s, size_t n)
     } while (false)
 
 #define vnew(vm, config) \
-    if (NULL == ((vm) = ufold_vm_new(config))) goto TEST_FAIL
+    if (NULL == ((vm) = ufold_vm_new(&config))) goto TEST_FAIL
 
 #define vfeed(vm, bytes, size) \
     if (!ufold_vm_feed((vm), (bytes), (size))) goto TEST_FAIL
