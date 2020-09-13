@@ -27,7 +27,7 @@ typedef struct ufold_vm_config_struct {
     bool hang_punctuation;       // whether to hang punctuation at line start
     bool keep_indentation;       // whether to keep indentation for wrapped text
     bool break_at_spaces;        // whether to break lines at spaces
-    bool truncate_bytes;         // whether to count bytes rather than columns
+    bool ascii_mode;             // whether to count bytes rather than columns
 } ufold_vm_config_t;
 
 /*\

@@ -206,7 +206,7 @@ static void print_manual(ufold_vm_config_t config)
     config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
-    config.truncate_bytes = false;
+    config.ascii_mode = false;
 
     exit(vwrite(manual, strlen(manual), config) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -217,7 +217,7 @@ static void print_help(bool error, ufold_vm_config_t config)
     config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
-    config.truncate_bytes = false;
+    config.ascii_mode = false;
 
     error = !vwrite(usage, strlen(usage), config) || error;
     exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -255,7 +255,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     bool to_print_version = false;
     bool to_keep_indentation = false;
     bool to_break_at_spaces = false;
-    bool to_truncate_bytes = false;
+    bool to_count_bytes = false;
 
     int c = -1;
     struct optparse opt;
@@ -265,7 +265,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
         switch (c) {
             case 'i': to_keep_indentation = true; break;
             case 's': to_break_at_spaces = true; break;
-            case 'b': to_truncate_bytes = true; break;
+            case 'b': to_count_bytes = true; break;
             case 'V': to_print_version = true; break;
             case '?':
                 warn("%s", opt.errmsg);
@@ -319,7 +319,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     config->hang_punctuation = to_hang_punctuation;
     config->keep_indentation = to_keep_indentation;
     config->break_at_spaces = to_break_at_spaces;
-    config->truncate_bytes = to_truncate_bytes;
+    config->ascii_mode = to_count_bytes;
 
     if (to_print_manual) print_manual(*config);
     else if (to_print_help) print_help(false, *config);
@@ -384,7 +384,7 @@ int main(int argc, char** argv)
         .hang_punctuation = false,
         .keep_indentation = false,
         .break_at_spaces = false,
-        .truncate_bytes = false,
+        .ascii_mode = false,
         .write = NULL,
         .realloc = NULL,
     };

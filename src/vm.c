@@ -199,7 +199,7 @@ bool ufold_vm_stop(ufold_vm_t* vm)
             debug_assert(vm->slot_used - vm->slot_cursor <= 4);
             // sanitize invalid/incomplete byte sequence
             size_t n = utf8_sanitize(vm->slots, vm->slot_used,
-                                     vm->config.truncate_bytes);
+                                     vm->config.ascii_mode);
 
             if (!vm_feed(vm, vm->slots, n)) {
                 logged_return(false);
@@ -237,7 +237,7 @@ bool ufold_vm_feed(ufold_vm_t* vm, const void* bytes, size_t size)
         size_t n = vm_slot(vm, ((const uint8_t*)bytes)[i]);
         if (n > 0) {
             // TODO: new option for interpreting ANSI color codes
-            size_t k = utf8_sanitize(vm->slots, n, vm->config.truncate_bytes);
+            size_t k = utf8_sanitize(vm->slots, n, vm->config.ascii_mode);
 
             if (!vm_feed(vm, vm->slots, k)) {
                 vm->stopped = true;
@@ -282,7 +282,7 @@ static size_t vm_slot(ufold_vm_t* vm, uint8_t byte)
     vm->slots[vm->slot_used++] = c;
 
     // ASCII fast path
-    if (vm->config.truncate_bytes) {
+    if (vm->config.ascii_mode) {
         debug_assert(vm->slot_cursor + 1 == vm->slot_used);
 
         vm->slot_cursor += 1;

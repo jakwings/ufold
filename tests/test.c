@@ -66,7 +66,7 @@ static bool write_to_buf(const void* s, size_t n)
         config.hang_punctuation = false; \
         config.keep_indentation = false; \
         config.break_at_spaces = false; \
-        config.truncate_bytes = false; \
+        config.ascii_mode = false; \
         clear_buf();
 
 #define TEST_END(name) \
