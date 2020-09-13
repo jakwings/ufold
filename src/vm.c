@@ -287,8 +287,7 @@ static size_t vm_slot(ufold_vm_t* vm, uint8_t byte)
 
         vm->slot_cursor += 1;
 
-        // support line-buffered output
-        if (is_linefeed(c)) {
+        if (vm->config.line_buffered && is_linefeed(c)) {
             return vm->slot_cursor;
         }
         return vm->slot_used == SLOT_SIZE ? vm->slot_cursor : 0;
@@ -330,13 +329,13 @@ static size_t vm_slot(ufold_vm_t* vm, uint8_t byte)
                 vm->slot_used -= n_bytes - 1;
                 vm->slot_cursor += 1;
 
-                // support line-buffered output
-                return vm->slot_cursor;
+                if (vm->config.line_buffered) {
+                    return vm->slot_cursor;
+                }
             } else {
                 vm->slot_cursor += n_bytes;
 
-                // support line-buffered output
-                if (is_linefeed(codepoint)) {
+                if (vm->config.line_buffered && is_linefeed(codepoint)) {
                     return vm->slot_cursor;
                 }
             }

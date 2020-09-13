@@ -28,6 +28,7 @@ typedef struct ufold_vm_config_struct {
     bool keep_indentation;       // whether to keep indentation for wrapped text
     bool break_at_spaces;        // whether to break lines at spaces
     bool ascii_mode;             // whether to count bytes rather than columns
+    bool line_buffered;          // whether to support line-buffered output
 } ufold_vm_config_t;
 
 /*\

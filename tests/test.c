@@ -67,6 +67,7 @@ static bool write_to_buf(const void* s, size_t n)
         config.keep_indentation = false; \
         config.break_at_spaces = false; \
         config.ascii_mode = false; \
+        config.line_buffered = false; \
         clear_buf();
 
 #define TEST_END(name) \
@@ -155,6 +156,7 @@ TEST_END (indent_03)
 
 
 TEST_START (line_buffered_01)
+    config.line_buffered = true;
     config.max_width = 10;
 
     vnew(vm, config);

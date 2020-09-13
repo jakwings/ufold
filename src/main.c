@@ -206,7 +206,6 @@ static void print_manual(ufold_vm_config_t config)
     config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
-    config.ascii_mode = false;
 
     exit(vwrite(manual, strlen(manual), config) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -217,7 +216,6 @@ static void print_help(bool error, ufold_vm_config_t config)
     config.hang_punctuation = false;
     config.keep_indentation = true;
     config.break_at_spaces = true;
-    config.ascii_mode = false;
 
     error = !vwrite(usage, strlen(usage), config) || error;
     exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -227,7 +225,7 @@ static void print_version(ufold_vm_config_t config)
 {
     char* info = PROGRAM " " VERSION "\n" COPYRIGHT "\n" LICENSE "\n";
     config.write = write_to_stdout;
-    config.hang_punctuation = false;
+    config.max_width = 0;
 
     exit(vwrite(info, strlen(info), config) ? EXIT_SUCCESS : EXIT_FAILURE);
 }
@@ -385,6 +383,7 @@ int main(int argc, char** argv)
         .keep_indentation = false,
         .break_at_spaces = false,
         .ascii_mode = false,
+        .line_buffered = true,
         .write = NULL,
         .realloc = NULL,
     };
