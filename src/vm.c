@@ -409,11 +409,11 @@ static bool vm_line_update_width(ufold_vm_t* vm, bool need_tab)
         for (size_t i = 0, j = vm->line_size; i < j; ++i) {
             uint8_t c = vm->line[i];
 
-            if (is_linefeed(c)) {
-                return true;
-            } else if (c == '\t') {
+            if (c == '\t') {
                 break;
             } else if (i + 1 == j) {
+                return true;
+            } else if (is_linefeed(c)) {
                 return true;
             }
         }
@@ -495,16 +495,17 @@ static bool vm_flush(ufold_vm_t* vm)
     }
 #endif
 
+    // XXX: how to only calculate new data?
     if (!vm_line_update_width(vm, false)) {
         logged_return(false);
     }
 
     while (vm->line_size > 0) {
-        // hard break inside a wide character right before line-end
         if (vm->state == VM_WRAP) {
             if (!vm->config.write("\n", 1)) {
                 logged_return(false);
             }
+            // hard break inside a wide character right before line-end
             if (is_linefeed(vm->line[0])) {
                 vm_line_shift(vm, 1, 0);
                 vm->offset = 0;
@@ -555,6 +556,9 @@ static bool vm_flush(ufold_vm_t* vm)
 
                 vm->state = VM_LINE;
             } else {
+                debug_assert(size == vm->line_size);
+                debug_assert(width == vm->line_width);
+
                 vm_line_shift(vm, size, width);
                 vm->offset += width;
             }
@@ -579,6 +583,7 @@ static bool vm_flush(ufold_vm_t* vm)
         size_t width = new_offset - vm->offset;
 
         if (linefeed != NULL) {
+            debug_assert(word_end == NULL);
             debug_assert(new_offset <= vm->config.max_width);
 
             if (!vm->config.write(vm->line, size)) {
@@ -638,9 +643,8 @@ static bool vm_flush(ufold_vm_t* vm)
                     if (!vm->config.write(vm->line, vm->line_size)) {
                         logged_return(false);
                     }
+                    vm_line_shift(vm, vm->line_size, vm->line_width);
                     vm->offset += vm->line_width;
-                    vm->line_size = 0;
-                    vm->line_width = 0;
                 }
 
                 vm->state = VM_WORD;

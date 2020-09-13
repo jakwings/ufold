@@ -215,7 +215,10 @@ static void print_manual(ufold_vm_config_t config)
     config.keep_indentation = true;
     config.break_at_spaces = true;
 
-    exit(vwrite(manual, strlen(manual), config) ? EXIT_SUCCESS : EXIT_FAILURE);
+    bool done = vwrite(manual, strlen(manual), config);
+    debug_assert(done);
+
+    exit(done ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 static void print_help(bool error, ufold_vm_config_t config)
@@ -225,8 +228,10 @@ static void print_help(bool error, ufold_vm_config_t config)
     config.keep_indentation = true;
     config.break_at_spaces = true;
 
-    error = !vwrite(usage, strlen(usage), config) || error;
-    exit(error ? EXIT_FAILURE : EXIT_SUCCESS);
+    bool done = vwrite(usage, strlen(usage), config);
+    debug_assert(done);
+
+    exit((error || !done) ? EXIT_FAILURE : EXIT_SUCCESS);
 }
 
 static void print_version(ufold_vm_config_t config)
@@ -235,7 +240,10 @@ static void print_version(ufold_vm_config_t config)
     config.write = write_to_stdout;
     config.max_width = 0;
 
-    exit(vwrite(info, strlen(info), config) ? EXIT_SUCCESS : EXIT_FAILURE);
+    bool done = vwrite(info, strlen(info), config);
+    debug_assert(done);
+
+    exit(done ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
@@ -452,5 +460,6 @@ FAIL:
     }
     ufold_vm_free(vm);
 
+    debug_assert(exitcode == EXIT_SUCCESS);
     return exitcode;
 }
