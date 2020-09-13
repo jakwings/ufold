@@ -148,6 +148,17 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
 
     vm->config = conf;
 
+    if (conf.punctuation != NULL) {
+        size_t len = strlen(conf.punctuation) + 1;
+
+        if ((vm->config.punctuation = conf.realloc(NULL, len)) != NULL) {
+            memcpy(vm->config.punctuation, conf.punctuation, len);
+        } else {
+            ufold_vm_free(vm);
+            return NULL;
+        }
+    }
+
 #ifndef UFOLD_DEBUG
     // inharmonious logic
     if (conf.max_width != 0) {
@@ -186,6 +197,7 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
 void ufold_vm_free(ufold_vm_t* vm)
 {
     if (vm != NULL) {
+        vm_free(vm, vm->config.punctuation);
         vm_free(vm, vm->line);
         vm_free(vm, vm->slots);
         vm_free(vm, vm->indent);
