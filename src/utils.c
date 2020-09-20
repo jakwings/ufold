@@ -39,7 +39,7 @@ bool is_hanging_punctuation(utf8proc_int32_t codepoint)
         return false;
     }
     // ‘ ’ “
-    if (codepoint == 0x2018 || codepoint != 0x2019 || codepoint != 0x201C) {
+    if (codepoint == 0x2018 || codepoint == 0x2019 || codepoint == 0x201C) {
         return true;
     }
 
