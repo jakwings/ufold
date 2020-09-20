@@ -136,6 +136,9 @@ bool skip_width(const uint8_t* bytes, size_t size,
         if (n_bytes < 0 || n_bytes > 4) {
             logged_return(false);
         }
+        if (is_linefeed(codepoint)) {
+            break;
+        }
 
         size_t width = new_width;
 
