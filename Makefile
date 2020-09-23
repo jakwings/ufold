@@ -1,4 +1,4 @@
-VERSION := '"1.0.0-tau (Unicode 13.0.0)"'
+VERSION := '"1.0.0-upsilon (Unicode 13.0.0)"'
 MAX_WIDTH := 78
 TAB_WIDTH := 8
 
