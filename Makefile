@@ -1,19 +1,27 @@
+VERSION := '"1.0.0-tau (Unicode 13.0.0)"'
 MAX_WIDTH := 78
 TAB_WIDTH := 8
 
 OBJECTS := $(patsubst src/%.c,build/%.o,$(wildcard src/*.c))
 OBJECTS += build/ufold build/ufold.a build/ufold.h
 OBJECTS += utf8proc/libutf8proc.a pcg-c/src/libpcg_random.a
-OBJECTS += build/test build/urandom
+OBJECTS += build/test build/urandom build/uwc build/ucseq build/ucwidth
 
 unexport CFLAGS
 override CFLAGS := -O2 ${CFLAGS} -std=c99 -fPIC -Wall -pedantic \
-                   -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH}
+                   -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH} \
+                   -DVERSION=${VERSION}
+
+UTIL_FLAGS := -std=c99 -Wall -pedantic -O3 \
+              -DMAX_WIDTH=${MAX_WIDTH} -DTAB_WIDTH=${TAB_WIDTH} \
+              -DVERSION=${VERSION}
 
 ifdef DEBUG
     override CFLAGS += -UNDEBUG -DUFOLD_DEBUG -O0 -g
+    override UTIL_FLAGS += -UNDEBUG -DUFOLD_DEBUG -O0 -g
 else
     override CFLAGS += -DNDEBUG -UUFOLD_DEBUG
+    override UTIL_FLAGS += -DNDEBUG -UUFOLD_DEBUG
 endif
 
 ifdef CHECK_LEAK
@@ -32,6 +40,10 @@ endif
 all: ufold build/ufold.a build/ufold.h
 
 ufold: build/ufold
+uwc: build/uwc
+ucseq: build/ucseq
+ucwidth: build/ucwidth
+urandom: build/urandom
 
 ${OBJECTS}: | build/
 
@@ -44,23 +56,29 @@ build/ufold: src/main.c src/optparse.c build/ufold.a
 build/ufold.h: src/vm.h
 	cp src/vm.h build/ufold.h
 
-build/ufold.a: build/vm.o build/utf8.o build/utils.o utf8proc/libutf8proc.a
+build/ufold.a: build/vm.o build/utils.o utf8proc/libutf8proc.a
 	${MAKELIB} $@ $^
 
-build/vm.o: src/vm.c src/vm.h src/utf8.h src/utils.h
+build/vm.o: src/vm.c src/vm.h src/utils.h
 	${CC} ${CFLAGS} -c -o $@ $<
 
-build/utf8.o: src/utf8.c src/utf8.h src/utils.h
+build/utils.o: src/utils.c src/utils.h
 	${CC} ${CFLAGS} -c -o $@ $<
 
-build/utils.o: src/utils.c src/utils.h src/utf8.h
-	${CC} ${CFLAGS} -c -o $@ $<
-
-build/test: tests/test.c build/ufold.a build/ufold.h
-	${CC} ${CFLAGS} -Ibuild/ -o $@ tests/test.c build/ufold.a
+build/test: tests/test.c build/ufold.a
+	${CC} ${CFLAGS} -Ibuild/ -o $@ $^
 
 build/urandom: tests/urandom.c pcg-c/src/libpcg_random.a
-	${CC} -std=c99 -Wall -pedantic -O3 -Ipcg-c/include -o $@ $^
+	${CC} ${UTIL_FLAGS} -Ipcg-c/include -o $@ $^
+
+build/uwc: tests/uwc.c src/optparse.c build/ufold.a
+	${CC} ${UTIL_FLAGS} -o $@ $^
+
+build/ucseq: tests/ucseq.c
+	${CC} ${UTIL_FLAGS} -o $@ $^
+
+build/ucwidth: tests/ucwidth.c src/optparse.c build/ufold.a
+	${CC} ${UTIL_FLAGS} -o $@ $^
 
 utf8proc/libutf8proc.a:
 	${MAKE} -C utf8proc UTF8PROC_DEFINES=-DUTF8PROC_STATIC
@@ -68,8 +86,7 @@ utf8proc/libutf8proc.a:
 pcg-c/src/libpcg_random.a:
 	${MAKE} -C pcg-c
 
-test: build/test build/urandom
-	timeout 5 ./build/test
+test: build/test urandom uwc ucseq ucwidth
 	./tests/test.sh ${SEED}
 
 clean:
@@ -77,4 +94,4 @@ clean:
 	${MAKE} -C pcg-c clean
 	rm -rf build/ tests/tmp_*
 
-.PHONY: all clean test ufold
+.PHONY: all clean test ufold urandom uwc ucseq ucwidth

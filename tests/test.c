@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -8,15 +7,7 @@
 #include "stdbool.h"
 #include "ufold.h"
 
-#define warn(fmt, ...) fprintf(stderr, "[ERROR]: " fmt "\n", __VA_ARGS__)
-
-#ifndef MAX_WIDTH
-#define MAX_WIDTH 78
-#endif
-
-#ifndef TAB_WIDTH
-#define TAB_WIDTH 8
-#endif
+#define warn(fmt, ...) fprintf(stderr, "%s " fmt "\n", "[ERROR]", __VA_ARGS__)
 
 static uint8_t* buf = NULL;
 static size_t buf_size = 0;

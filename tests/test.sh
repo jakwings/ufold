@@ -2,8 +2,17 @@
 
 cd -- "$(dirname -- "$0")"
 
+echo() {
+  printf '%s\n' "$*"
+}
+
+utest=../build/test
 ufold=../build/ufold
+ofold=../build/ofold
 urandom=../build/urandom
+uwc=../build/uwc
+ucwidth=../build/ucwidth
+
 loop=42
 seconds=5
 seed="${1:-$(date '+%s')}"
@@ -11,7 +20,7 @@ seed="${1:-$(date '+%s')}"
 printf '[SEED=%s]\n\n' "${seed}"
 
 if [ ! -x "${ufold}" ]; then
-    ufold="$(type -p ufold)"
+    ufold="$(command -v ufold)"
     if [ "$?" -ne 0 ]; then
         printf 'ufold not found\n'
         exit 1
@@ -19,28 +28,55 @@ if [ ! -x "${ufold}" ]; then
 fi
 printf 'Using ufold: %s\n' "${ufold}"
 
-fold() {
+if [ -x "${ofold}" ] && ! cmp -s "${x}" "${ufold}"; then
+    printf 'Using ofold: %s\n' "${ofold}"
+else
+    ofold=
+fi
+
+ufold() {
     timeout "${seconds}" "${ufold}" "$@"
+}
+ofold() {
+    timeout "${seconds}" "${ofold}" "$@"
 }
 
 exit_if_failed() {
-    local exitcode=$?
+    exitcode=$?
     if [ "${exitcode}" -ne 0 ]; then
         printf 'Failed\n'
-        wc -c tmp_stdin tmp_stdout
+        "${uwc}" -nv tmp_stdin tmp_stdout
         cat tmp_stderr
         exit "${exitcode}"
+    elif [ -f tmp_expect ]; then
+        if ! diff -u tmp_expect tmp_stdout > tmp_diff 2>&1; then
+            printf 'Failed\n'
+            "${uwc}" -bcwlnv tmp_stdin tmp_expect tmp_stdout
+            cat tmp_diff
+            printf '#\n'
+            exit 1
+        fi
     fi
 }
 
 if [ -r tmp_flags ]; then
-    printf 'Retry the previous failed test: ufold %s ... ' "$(cat tmp_flags)"
-    fold $(cat tmp_flags) < tmp_stdin > tmp_stdout 2> tmp_stderr
+    flags="$(cat tmp_flags)"
+    printf 'Retry the previous failed test: ufold %s ... ' "${flags}"
+    ufold $flags < tmp_stdin > tmp_stdout 2> tmp_stderr
+    exit_if_failed
+    rm -f tmp_expect
+    "${ucwidth}" $flags < tmp_stdout > /dev/null 2> tmp_stderr
     exit_if_failed
     printf 'Done\n'
 fi
 
+if [ -e "${utest}" ]; then
+    rm -f tmp_*
+    timeout "${seconds}" "${utest}" || exit 1
+fi
+
 # test regular inputs
+rm -f tmp_*
 i=1
 while read -r flags; do
     num="$(printf '%03d' "${i}")"
@@ -50,18 +86,11 @@ while read -r flags; do
     printf '\r[TEST] ufold %-16s  %s ... ' "${flags}" "${input}"
 
     printf '%s\n' "${flags}" > tmp_flags
+    { cat "${output}"; echo; cat "${output}"; } > tmp_expect
     { cat "${input}"; echo; cat "${input}"; } |
         tee tmp_stdin |
-            fold $flags > tmp_stdout 2> tmp_stderr
+            ufold $flags > tmp_stdout 2> tmp_stderr
     exit_if_failed
-
-    { cat "${output}"; echo; cat "${output}"; } > tmp_expect
-    diff -u tmp_expect tmp_stdout > tmp_diff 2>&1
-    if [ "$?" -ne 0 ]; then
-        printf 'Failed\n'
-        cat tmp_diff
-        exit 2
-    fi
 
     printf 'Done\n'
 
@@ -69,9 +98,9 @@ while read -r flags; do
 done < flags.txt
 
 # test exit status
-flags_w="$(printf ' -w%s ' $(seq 8 -1 0))"
-flags_t="$(printf ' -t%s ' $(seq 8 -1 0))"
-flags_bis='-b -s -i -bs -bi -is -bis'
+flags_w="$(printf ' -w%s ' 80 8 3 1)"
+flags_t="$(printf ' -t%s ' 8 3 1 0)"
+flags_bis="-b -s -i -bs -bi -is -bis -ip -bip -isp -bisp"
 flags=" \
     -V -h '' \
     ${flags_w} \
@@ -88,6 +117,7 @@ flags=" \
       done
     ) \
 "
+rm -f tmp_*
 read_total=0
 read_delta=10086
 eval "set -- ${flags}"
@@ -96,11 +126,22 @@ for args; do
 
     i=1
     while [ "${i}" -le "${loop}" ]; do
-        printf '\r[TEST] ufold %-16s  # Round %d ... ' "${args}" "${i}"
+        printf '\r[TEST] ufold %-16s  # Round %-2s (%s+%s)... ' \
+               "${args}" "${i}" "${read_total}" "${read_delta}"
 
-        "${urandom}" "${seed}" "${read_total}" | head -c"${read_delta}" |
-            tee tmp_stdin |
-                fold $args > tmp_stdout 2> tmp_stderr
+        "${urandom}" "${seed}" "${read_total}" |
+            head -c"${read_delta}" > tmp_stdin
+
+        if [ -n "${ofold}" ] && case "${args}" in (*[hV]*) false; esac; then
+            ofold $args < tmp_stdin 2> tmp_stderr | tee tmp_expect > tmp_stdout
+            exit_if_failed
+        fi
+
+        ufold $args < tmp_stdin > tmp_stdout 2> tmp_stderr
+        exit_if_failed
+
+        rm -f tmp_expect
+        "${ucwidth}" $args < tmp_stdout > /dev/null 2> tmp_stderr
         exit_if_failed
 
         read_total=$(( read_total + read_delta ))

@@ -26,6 +26,7 @@ typedef struct ufold_vm_config_struct {
     bool break_at_spaces;        // whether to break lines at spaces
     bool ascii_mode;             // whether to count bytes rather than columns
     bool line_buffered;          // whether to support line-buffered output
+    // TODO: --reserve=width
 } ufold_vm_config_t;
 
 /*\

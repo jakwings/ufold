@@ -11,18 +11,24 @@
 #include "utils.h"
 #include "vm.h"
 
-#define warn(fmt, ...) fprintf(stderr, "%s " fmt "\n", "[ERROR]", __VA_ARGS__)
+#define warn(fmt, ...) log("%s " fmt "\n", "[ERROR]", __VA_ARGS__)
+
+#if CHAR_BIT != 8
+#error "char must be exactly 8-bit wide"
+#endif
 
 #ifndef MAX_WIDTH
-#define MAX_WIDTH 78
+#error "MAX_WIDTH is undefined"
 #endif
 
 #ifndef TAB_WIDTH
-#define TAB_WIDTH 8
+#error "TAB_WIDTH is undefined"
 #endif
 
 #define PROGRAM "ufold"
-#define VERSION "1.0.0-tau (Unicode 13.0.0)"
+#ifndef VERSION
+#error "VERSION is undefined"
+#endif
 
 #define COPYRIGHT "Copyright (c) 2018 J.W https://github.com/jakwings/ufold"
 #define LICENSE "License: https://opensource.org/licenses/ISC"
@@ -51,7 +57,8 @@ static const char* const manual =
 "  DESCRIPTION\n"
 "         Wrap input lines from files and write to standard output.\n"
 "\n"
-"         When no file is specified, read from standard input.\n"
+"         When no file is specified, or when a file path is empty,"
+          " read from standard input.\n"
 "\n"
 "         The letter u in the name stands for UTF-8, a superset of ASCII.\n"
 "\n"
@@ -60,7 +67,7 @@ static const char* const manual =
 "                Setting it to zero prevents wrapping.\n"
 "\n"
 "         -t, --tab <width>\n"
-"                Maximum columns for each TAB character. Default: 8.\n"
+"                Maximum columns for each tab. Default: 8.\n"
 "                It does not change any setting of the terminal.\n"
 "\n"
 "         -p, --hang[=<characters>]\n"
@@ -124,7 +131,7 @@ static const char* const usage =
 "\n"
 "OPTIONS\n"
 "    -w, --width <width>   Maximum columns for each line.\n"
-"    -t, --tab <width>     Maximum columns for each TAB character.\n"
+"    -t, --tab <width>     Maximum columns for each tab.\n"
 "    -p, --hang[=<chars>]  Hanging punctuation.\n"
 "    -i, --indent          Keep indentation for wrapped text.\n"
 "    -s, --spaces          Break lines at spaces.\n"
@@ -149,7 +156,7 @@ static bool vwrite(const void* s, size_t n, ufold_vm_config_t config)
 
     if (vm == NULL || !ufold_vm_feed(vm, s, n) || !ufold_vm_stop(vm)) {
         if (errno != 0) {
-            perror(NULL);
+            warn("%s", strerror(errno));
         } else {
             warn("unknown error, please report bugs to %s", ISSUES);
         }
@@ -158,53 +165,6 @@ static bool vwrite(const void* s, size_t n, ufold_vm_config_t config)
     }
     ufold_vm_free(vm);
 
-    return true;
-}
-
-static bool parse_integer(const char* str, size_t* num)
-{
-    if (str == NULL) {
-        return false;
-    }
-    size_t n = 0;
-    size_t k = 0;
-
-    for (const char* p = str; *p != '\0'; ++p) {
-        if (!('0' <= *p && *p <= '9')) {
-            return false;
-        }
-        k = *p - '0';
-
-        if ((n > 0 && SIZE_MAX / n < 10) || n * 10 + k < n) {
-            n = SIZE_MAX;
-            continue;
-        }
-        n = n * 10 + k;
-    }
-    *num = n;
-
-    return true;
-}
-
-static bool check_punctuation(const char* bytes, size_t size)
-{
-    utf8proc_int32_t codepoint = -1;
-    utf8proc_ssize_t n_bytes = -1;
-
-    for (size_t i = 0; i < size; i += n_bytes) {
-        n_bytes = utf8proc_iterate((uint8_t*)bytes + i, size - i, &codepoint);
-
-        if (n_bytes == 0) {
-            break;
-        }
-        if (n_bytes < 0 || n_bytes > 4) {
-            return false;
-        }
-        if (is_whitespace(codepoint) || is_controlchar(codepoint) ||
-                utf8proc_charwidth(codepoint) < 0) {
-            return false;
-        }
-    }
     return true;
 }
 
@@ -272,6 +232,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     bool to_count_bytes = false;
 
     int c = -1;
+    int t = -1;
     struct optparse opt;
 
     optparse_init(&opt, *argv);
@@ -281,9 +242,6 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
             case 's': to_break_at_spaces = true; break;
             case 'b': to_count_bytes = true; break;
             case 'V': to_print_version = true; break;
-            case '?':
-                warn("%s", opt.errmsg);
-                return false;
             case 'h':
                 if (!strcmp("--help", (opt.argv)[opt.optind-1])) {
                     to_print_manual = true;
@@ -296,10 +254,7 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
                     punctuation = NULL;
                     to_hang_punctuation = true;
                 } else if (strlen(opt.optarg) > 0) {
-                    if (!check_punctuation(opt.optarg, strlen(opt.optarg))) {
-                        warn("option requires non-whitespace characters in the UTF-8 encoding -- '%c'", c);
-                        return false;
-                    }
+                    t = c;
                     punctuation = opt.optarg;
                     to_hang_punctuation = true;
                 } else {
@@ -319,6 +274,9 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
                     return false;
                 }
                 break;
+            case '?':
+                warn("%s", opt.errmsg);
+                return false;
             default:
                 warn("unhandled option '%c', please report to %s", c, ISSUES);
                 exit(EXIT_FAILURE);
@@ -326,6 +284,13 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     }
     *argc -= opt.optind;
     *argv += opt.optind;
+
+    if (punctuation != NULL && !check_punctuation(punctuation,
+                                                  strlen(punctuation),
+                                                  to_count_bytes)) {
+        warn("option requires well-formed non-control characters -- '%c'", t);
+        return false;
+    }
 
     config->max_width = max_width;
     config->tab_width = tab_width;
@@ -352,13 +317,13 @@ static bool wrap_input(ufold_vm_t* vm, FILE* stream)
         do {
             size_t size = fread(buf, 1, BUFSIZE, stream);
             if (ferror(stream)) {
-                return false;
+                logged_return(false);
             }
             if (!ufold_vm_feed(vm, buf, size)) {
-                return false;
+                logged_return(false);
             }
-            if (has_linefeed((uint8_t*)buf, size) && !ufold_vm_flush(vm)) {
-                return false;
+            if (has_linefeed((void*)buf, size, true) && !ufold_vm_flush(vm)) {
+                logged_return(false);
             }
         } while (!feof(stream));
     } else {
@@ -368,13 +333,13 @@ static bool wrap_input(ufold_vm_t* vm, FILE* stream)
             (void)n;
 
             if (ferror(stream)) {
-                return false;
+                logged_return(false);
             }
             if (!ufold_vm_feed(vm, &c, 1)) {
-                return false;
+                logged_return(false);
             }
-            if (is_linefeed(c) && !ufold_vm_flush(vm)) {
-                return false;
+            if (is_linefeed(c, true) && !ufold_vm_flush(vm)) {
+                logged_return(false);
             }
         } while (!feof(stream));
     }
@@ -384,11 +349,6 @@ static bool wrap_input(ufold_vm_t* vm, FILE* stream)
 
 int main(int argc, char** argv)
 {
-    if (sizeof(char) != sizeof(uint8_t)) {
-        warn("sizeof(char)=%zu sizeof(uint8_t)=%zu",
-                sizeof(char), sizeof(uint8_t));
-        return EXIT_FAILURE;
-    }
     int exitcode = EXIT_SUCCESS;
 
     ufold_vm_config_t config;
@@ -410,7 +370,7 @@ int main(int argc, char** argv)
         print_help(true, config);
     }
 
-    FILE* stream = stdin;
+    FILE* stream = NULL;
     ufold_vm_t* vm = ufold_vm_new(&config);
 
     if (vm == NULL) {
@@ -420,37 +380,44 @@ int main(int argc, char** argv)
 
     if (argc > 0) {
         for (int i = 0; i < argc; ++i) {
-            if ((stream = fopen(argv[i], "rb")) == NULL) {
-                warn("failed to open \"%s\"", argv[i]);
+            const char* filepath = argv[i];
+            const char* alias = *filepath != '\0' ? filepath : "";  // or "/dev/stdin"?
+
+            stream = *filepath != '\0' ? fopen(filepath, "rb") : stdin;
+
+            if (stream == NULL) {
+                warn("failed to open \"%s\"", alias);
                 goto FAIL;
             }
             if (!wrap_input(vm, stream)) {
-                warn("failed to process \"%s\"", argv[i]);
+                warn("failed to process \"%s\"", alias);
                 goto FAIL;
             }
-            if (fclose(stream) != 0) {
-                warn("failed to close \"%s\"", argv[i]);
+            if (stream != stdin && fclose(stream) != 0) {
+                warn("failed to close \"%s\"", alias);
                 goto FAIL;
             }
         }
-    } else if (!wrap_input(vm, stream)) {
-        warn("%s", "failed to process stdin");
-        goto FAIL;
+    } else {
+        stream = stdin;
+
+        if (!wrap_input(vm, stream)) {
+            warn("%s", "failed to process stdin");
+            goto FAIL;
+        }
     }
 
-    if (ferror(stream)) {
+    if (stream != NULL && ferror(stream)) {
 FAIL:
         if (errno != 0) {
-            perror(NULL);
+            warn("%s", strerror(errno));
             errno = 0;
         } else {
             warn("unknown error, please report bugs to %s", ISSUES);
         }
-        exitcode = EXIT_FAILURE;
+        (void)fclose(stream);  // whatever
 
-        if (stream != stdin) {
-            fclose(stream);  // whatever
-        }
+        exitcode = EXIT_FAILURE;
     }
 
     // flush all output
