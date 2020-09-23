@@ -209,9 +209,10 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
     size_t alt_width = new_width;
 
     const uint8_t* linefeed = NULL;
+    const uint8_t* space_end = NULL;
     const uint8_t* word_ind = NULL;
     const uint8_t* word_end = NULL;
-    const uint8_t* space_end = NULL;
+    size_t word_len = 0;
 
     utf8proc_int32_t codepoint = -1;
     utf8proc_ssize_t n_bytes = -1;
@@ -231,10 +232,14 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
                 word_ind = bytes + i + n_bytes;
             } else {
                 if (word_ind != NULL) {
-                    space_end = NULL;
-                    word_end = word_ind;
-                    alt_width = new_width;
+                    // no break at zero-width text after newline
+                    if (word_len > 0) {
+                        space_end = NULL;
+                        word_end = word_ind;
+                        alt_width = new_width;
+                    }
                     word_ind = NULL;
+                    word_len = 0;
                 }
             }
         }
@@ -261,6 +266,8 @@ bool break_line(const uint8_t* bytes, size_t size, bool with_space,
                 }
                 space_end = bytes + i + n_bytes;
                 alt_width = next_width;
+            } else {
+                word_len += next_width - new_width;
             }
         }
 
