@@ -22,7 +22,8 @@ ______________________________________________________________________________
   DESCRIPTION
          Wrap input lines from files and write to standard output.
 
-         When no file is specified, read from standard input.
+         When no file is specified, or when a file path is empty, read from
+         standard input.
 
          The letter u in the name stands for UTF-8, a superset of ASCII.
 
@@ -31,7 +32,7 @@ ______________________________________________________________________________
                 Setting it to zero prevents wrapping.
 
          -t, --tab <width>
-                Maximum columns for each TAB character. Default: 8.
+                Maximum columns for each tab. Default: 8.
                 It does not change any setting of the terminal.
 
          -p, --hang[=<characters>]
@@ -82,5 +83,49 @@ ______________________________________________________________________________
          Copyright (c) 2018 J.W https://github.com/jakwings/ufold
 
          License: https://opensource.org/licenses/ISC
+
+______________________________________________________________________________
+
+______________________________________________________________________________
+
+
+                            ADDITIONAL UTILITIES
+
+  USAGE
+      uwc [options] [files]
+
+      Count bytes, characters, words, lines and the maximum width.
+      By default, input must be encoded using the UTF-8 format.
+      When no file is specified, read from standard input.
+
+  OPTIONS
+      -t, --tab <width>     Maximum columns for each tab.
+      -b, --bytes           Count bytes.
+      -c, --chars           Count characters.
+      -w, --words           Count words.
+      -l, --lines           Count lines.
+      -m, --width           Count the maximum line width.
+      -L, --linear          No end-of-file be end-of-line.
+      -n, --numb            Darn non-ASCII encoded text.
+      -s, --strict          Warn about strange input.
+      -v, --verbose         Show headers and summary.
+      -h, --help            Show help information.
+      -V, --version         Show version information.
+
+  USAGE
+      ucwidth [options] [files]
+
+      Count widths of lines from the output of ufold.
+      When no file is specified, read from standard input.
+
+  OPTIONS
+      -w, --width <width>   Maximum columns for each line.
+      -t, --tab <width>     Maximum columns for each tab.
+      -p, --hang[=<chars>]  Hanging punctuation.
+      -i, --indent          Keep indentation for wrapped text.
+      -s, --spaces          Break lines at spaces.
+      -b, --bytes           Count bytes rather than columns.
+      -h, --help            Show help information.
+      -V, --version         Show version information.
 
 ______________________________________________________________________________
