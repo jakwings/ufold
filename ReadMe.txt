@@ -115,15 +115,13 @@ ______________________________________________________________________________
   USAGE
       ucwidth [options] [files]
 
-      Count widths of lines from the output of ufold.
+      Count widths of lines formated in the UTF-8 encoding.
       When no file is specified, read from standard input.
 
   OPTIONS
       -w, --width <width>   Maximum columns for each line.
       -t, --tab <width>     Maximum columns for each tab.
-      -p, --hang[=<chars>]  Hanging punctuation.
-      -i, --indent          Keep indentation for wrapped text.
-      -s, --spaces          Break lines at spaces.
+      [... uninteresting options left out here ...]
       -b, --bytes           Count bytes rather than columns.
       -h, --help            Show help information.
       -V, --version         Show version information.
