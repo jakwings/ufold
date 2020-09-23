@@ -517,6 +517,24 @@ static bool vm_flush(ufold_vm_t* vm)
 
     while (vm->line_size > 0) {
         if (vm->state == VM_WRAP) {
+            if (vm->config.break_at_spaces) {
+                const uint8_t* word_start = vm->line;
+                size_t skipped_width = vm->offset;
+
+                if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
+                            &word_start, &skipped_width)) {
+                    logged_return(false);
+                }
+                (void)(skipped_width = skipped_width - vm->offset);
+
+                // trim leading spaces from original text
+                vm_line_shift(vm, word_start - vm->line, 0);
+
+                if (vm->line_size <= 0) {
+                    break;
+                }
+            }
+
             if (!vm->config.write("\n", 1)) {
                 logged_return(false);
             }
@@ -629,22 +647,6 @@ static bool vm_flush(ufold_vm_t* vm)
             }
             vm_line_shift(vm, size, width);
 
-            if (vm->config.break_at_spaces) {
-                vm->offset += width;
-
-                const uint8_t* word_start = vm->line;
-                size_t skipped_width = vm->offset;
-
-                if (!skip_space(vm->line, vm->line_size, vm->config.tab_width,
-                                &word_start, &skipped_width)) {
-                    logged_return(false);
-                }
-                skipped_width = skipped_width - vm->offset;
-
-                // trim leading spaces from original text
-                vm_line_shift(vm, word_start - vm->line, skipped_width);
-            }
-
             vm->offset = vm->indent_width;
             // recalculate TAB width
             if (!vm_line_update_width(vm, true)) {
@@ -683,6 +685,7 @@ static bool vm_flush(ufold_vm_t* vm)
                 if (!vm->config.write(vm->line, size)) {
                     logged_return(false);
                 }
+
                 vm_line_shift(vm, size, width);
                 vm->offset = vm->indent_width;
                 // recalculate TAB width
