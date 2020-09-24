@@ -45,7 +45,7 @@ exit_if_failed() {
     exitcode=$?
     if [ "${exitcode}" -ne 0 ]; then
         printf 'Failed\n'
-        "${uwc}" -nv tmp_stdin tmp_stdout
+        "${uwc}" -v tmp_stdin tmp_stdout
         cat tmp_stderr
         exit "${exitcode}"
     elif [ -f tmp_expect ]; then

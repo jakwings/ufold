@@ -40,7 +40,8 @@ static const char* const usage =
 "OPTIONS\n"
 "    -t, --tab <width>     Maximum columns for each tab.\n"
 "    -b, --bytes           Count bytes.\n"
-"    -c, --chars           Count characters.\n"
+"    -c, --chars           Count chars (codepoints).\n"
+"    -g, --graphs          Count word chars.\n"
 "    -w, --words           Count words.\n"
 "    -l, --lines           Count lines.\n"
 "    -m, --width           Count the maximum line width.\n"
@@ -56,6 +57,7 @@ typedef struct struct_record {
     const char* filepath;
     size_t bytes;
     size_t chars;
+    size_t graphs;
     size_t words;
     size_t lines;
     size_t width;
@@ -65,6 +67,7 @@ typedef struct struct_config {
     size_t tab_width;
     bool count_bytes;
     bool count_chars;
+    bool count_graphs;
     bool count_words;
     bool count_lines;
     bool count_width;
@@ -74,15 +77,17 @@ typedef struct struct_config {
     bool verbose_mode;
 } Config;
 
-static void parse_options(int* argc, char*** argv, Config* config)
+static bool parse_options(int* argc, char*** argv, Config* config)
 {
-    struct optparse_long optspecs[] = {
+    static const struct optparse_long optspecs[] = {
         {"tab",      't',  OPTPARSE_REQUIRED},
         {"bytes",    'b',  OPTPARSE_NONE},
         {"chars",    'c',  OPTPARSE_NONE},
+        {"graphs",   'g',  OPTPARSE_NONE},
         {"words",    'w',  OPTPARSE_NONE},
         {"lines",    'l',  OPTPARSE_NONE},
         {"width",    'm',  OPTPARSE_NONE},
+        {"grapheme", 'G',  OPTPARSE_NONE},
         {"linear",   'L',  OPTPARSE_NONE},
         {"numb",     'n',  OPTPARSE_NONE},
         {"strict",   's',  OPTPARSE_NONE},
@@ -92,14 +97,13 @@ static void parse_options(int* argc, char*** argv, Config* config)
         {0}
     };
 
-    int c = -1;
-    struct optparse opt;
     size_t tab_width = config->tab_width;
     bool to_print_help = false;
     bool to_print_version = false;
     bool to_count_everything = true;
     bool to_count_bytes = false;
     bool to_count_chars = false;
+    bool to_count_graphs = false;
     bool to_count_words = false;
     bool to_count_lines = false;
     bool to_count_width = false;
@@ -108,17 +112,21 @@ static void parse_options(int* argc, char*** argv, Config* config)
     bool to_verbose_mode = false;
     bool to_eof_is_to_eol = true;
 
+    int c = -1;
+    struct optparse opt;
     optparse_init(&opt, *argv);
+
     while ((c = optparse_long(&opt, optspecs, NULL)) != -1) {
         switch (c) {
             case 't':
                 if (!parse_integer(opt.optarg, &tab_width)) {
                     warn("option requires a non-negative integer -- '%c'", c);
-                    exit(1);
+                    return false;
                 }
                 break;
             case 'b': to_count_bytes = true; break;
             case 'c': to_count_chars = true; break;
+            case 'g': to_count_graphs = true; break;
             case 'w': to_count_words = true; break;
             case 'l': to_count_lines = true; break;
             case 'm': to_count_width = true; break;
@@ -130,7 +138,7 @@ static void parse_options(int* argc, char*** argv, Config* config)
             case 'V': to_print_version = true; break;
             case '?':
                 warn("%s", opt.errmsg);
-                exit(1);
+                return false;
             default:
                 error("unhandled option");
         }
@@ -147,13 +155,15 @@ static void parse_options(int* argc, char*** argv, Config* config)
         exit(0);
     }
 
-    if (to_count_bytes || to_count_chars || to_count_words || to_count_lines || to_count_width) {
+    if (to_count_bytes || to_count_chars || to_count_graphs ||
+            to_count_words || to_count_lines || to_count_width) {
         to_count_everything = false;
     }
 
     config->tab_width = tab_width;
     config->count_bytes = to_count_everything || to_count_bytes;
     config->count_chars = to_count_everything || to_count_chars;
+    config->count_graphs = to_count_everything || to_count_graphs;
     config->count_words = to_count_everything || to_count_words;
     config->count_lines = to_count_everything || to_count_lines;
     config->count_width = to_count_everything || to_count_width;
@@ -161,6 +171,8 @@ static void parse_options(int* argc, char*** argv, Config* config)
     config->numb_mode = to_numb_mode;
     config->strict_mode = to_strict_mode;
     config->verbose_mode = to_verbose_mode;
+
+    return true;
 }
 
 static bool ist_linefeed(utf8proc_int32_t c, bool numb_mode)
@@ -209,7 +221,7 @@ static bool ist_wordchar(utf8proc_int32_t c, bool numb_mode)
 static bool measure_file(FILE* stream, const char* filepath, const Config* config, Record* record)
 {
     // TODO: count grapheme clusters
-    size_t bytes = 0, chars = 0, words = 0, lines = 0, width = 0;
+    size_t bytes = 0, chars = 0, graphs = 0, words = 0, lines = 0, width = 0;
 
     utf8proc_uint8_t buf[BUFSIZE];
     utf8proc_int32_t codepoint = -1;
@@ -234,7 +246,8 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
             error("integer overflow");
         }
 
-        if (config->count_chars || config->count_words || config->count_lines || config->count_width) {
+        if (config->count_chars || config->count_graphs ||
+                config->count_words || config->count_lines || config->count_width) {
             for (index = 0; index < size; index += n_bytes) {
                 bool is_cc = false;
                 bool is_valid_ch = true;
@@ -298,8 +311,8 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                     error("integer overflow");
                 }
 
-                if (config->count_words || config->count_width) {
-                    size_t cwidth = SIZE_MAX - length + 1;
+                if (config->count_graphs || config->count_words || config->count_width) {
+                    size_t cwidth = SIZE_MAX - offset + 1;
 
                     if (codepoint == '\t') {
                         if (config->tab_width > 1) {
@@ -329,38 +342,52 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                     if (!add(&offset, cwidth)) {
                         error("integer overflow");
                     }
-                    length = max(length, offset);
 
-                    if (config->count_words) {
+                    if (config->count_width) {
+                        length = max(length, offset);
+                    }
+
+                    if (config->count_graphs || config->count_words) {
                         if (ist_wordchar(codepoint, config->numb_mode)) {
-                            word_len += cwidth;
-                            at_word = true;
-                        } else {
-                            if (at_word && word_len > 0 && !add(&words, 1)) {
+                            if (config->count_graphs && !add(&graphs, 1)) {
                                 error("integer overflow");
                             }
-                            word_len = 0;
-                            at_word = false;
+                            if (config->count_words) {
+                                word_len += cwidth;
+                                at_word = true;
+                            }
+                        } else {
+                            if (config->count_words) {
+                                if (at_word && word_len > 0 && !add(&words, 1)) {
+                                    error("integer overflow");
+                                }
+                                word_len = 0;
+                                at_word = false;
+                            }
                         }
                     }
                 }
 
                 if (config->count_lines || config->count_width) {
                     if (ist_linefeed(codepoint, config->numb_mode)) {
-                        if (!add(&lines, 1)) {
+                        if (config->count_lines && !add(&lines, 1)) {
                             error("integer overflow");
                         }
-                        width = max(length, width);
+                        if (config->count_width) {
+                            width = max(length, width);
+                        }
 
                         offset = 0;
                         length = 0;
                     }
                 }
             }
+            size = size - index;
+            memmove(buf, buf + index, size);
+        } else {
+            index = size;
+            size = 0;
         }
-
-        size = size - index;
-        memmove(buf, buf + index, size);
     } while (!feof(stream));
 
     if (index < size) {
@@ -370,18 +397,21 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
     }
 
     if (length > 0) {
-        if (at_word && word_len > 0 && !add(&words, 1)) {
+        if (config->count_words && at_word && word_len > 0 && !add(&words, 1)) {
             error("integer overflow");
         }
         if (!config->eof_not_eol && !add(&lines, 1)) {
             error("integer overflow");
         }
-        width = max(length, width);
+        if (config->count_width) {
+            width = max(length, width);
+        }
     }
 
     record->filepath = filepath;
     record->bytes = bytes;
     record->chars = chars;
+    record->graphs = graphs;
     record->words = words;
     record->lines = lines;
     record->width = width;
@@ -394,31 +424,35 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     // TODO: use big integer
     Record total = {
         .filepath = "TOTAL",
-        .bytes = 0, .chars = 0, .words = 0, .lines = 0, .width = 0,
+        .bytes = 0, .chars = 0, .graphs = 0, .words = 0, .lines = 0, .width = 0,
     };
+
+#define K (sizeof(offsets) / sizeof(*offsets))
 
     static size_t const offsets[] = {
         0,
         offsetof(Record, lines),
         offsetof(Record, words),
+        offsetof(Record, graphs),
         offsetof(Record, chars),
         offsetof(Record, bytes),
         offsetof(Record, width),
         offsetof(Record, filepath),
     };
 
-    const char* headers[7] = {
+    const char* headers[K] = {
         config->verbose_mode ? "TOTAL" : NULL,
         config->count_lines ? "LINES" : NULL,
         config->count_words ? "WORDS" : NULL,
+        config->count_graphs ? "GRAPHS" : NULL,
         config->count_chars ? "CHARS" : NULL,
         config->count_bytes ? "BYTES" : NULL,
         config->count_width ? "WIDTH" : NULL,
         "INPUT",
     };
 
-    size_t fmt_size[7] = {0};  // total, column...
-    int tmp_size[7] = {0};
+    size_t fmt_size[K] = {0};  // total, column...
+    int tmp_size[K] = {0};
     char* output = NULL;
     char* p = NULL;
     size_t i, k, n, t;
@@ -428,10 +462,11 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     }
 
     //\ accumulate data
-    for (fmt_size[6] = strlen(headers[6]), i = 0; i < size; ++i) {
+    for (fmt_size[K - 1] = strlen(headers[K - 1]), i = 0; i < size; ++i) {
         if (false ||
                 (config->count_lines && !add(&total.lines, records[i].lines)) ||
                 (config->count_words && !add(&total.words, records[i].words)) ||
+                (config->count_graphs && !add(&total.graphs, records[i].graphs)) ||
                 (config->count_chars && !add(&total.chars, records[i].chars)) ||
                 (config->count_bytes && !add(&total.bytes, records[i].bytes))) {
             error("integer overflow");
@@ -439,17 +474,18 @@ static bool write_records(const Record* records, size_t size, const Config* conf
         if (config->count_width) {
             total.width = max(records[i].width, total.width);
         }
-        fmt_size[6] = max(strlen(records[i].filepath), fmt_size[6]);
+        fmt_size[K - 1] = max(strlen(records[i].filepath), fmt_size[K - 1]);
     }
     if (false ||
             (config->count_lines && (tmp_size[1] = snprintf(NULL, 0, "%zu", total.lines)) < 0) ||
             (config->count_words && (tmp_size[2] = snprintf(NULL, 0, "%zu", total.words)) < 0) ||
-            (config->count_chars && (tmp_size[3] = snprintf(NULL, 0, "%zu", total.chars)) < 0) ||
-            (config->count_bytes && (tmp_size[4] = snprintf(NULL, 0, "%zu", total.bytes)) < 0) ||
-            (config->count_width && (tmp_size[5] = snprintf(NULL, 0, "%zu", total.width)) < 0)) {
+            (config->count_graphs && (tmp_size[3] = snprintf(NULL, 0, "%zu", total.graphs)) < 0) ||
+            (config->count_chars && (tmp_size[4] = snprintf(NULL, 0, "%zu", total.chars)) < 0) ||
+            (config->count_bytes && (tmp_size[5] = snprintf(NULL, 0, "%zu", total.bytes)) < 0) ||
+            (config->count_width && (tmp_size[6] = snprintf(NULL, 0, "%zu", total.width)) < 0)) {
         error("formatting failed");
     }
-    for (fmt_size[0] = fmt_size[6], k = 1; k <= 5; ++k) {
+    for (fmt_size[0] = fmt_size[K - 1], k = 1; k <= K - 2; ++k) {
         if (headers[k] != NULL) {
             fmt_size[k] = max(tmp_size[k], strlen(headers[k])) + 2;
 
@@ -469,7 +505,7 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     if (config->verbose_mode) {
         memset(output, ' ', fmt_size[0]);
 
-        for (n = fmt_size[0], p = output, k = 1; k <= 6; ++k) {
+        for (n = fmt_size[0], p = output, k = 1; k <= K - 1; ++k) {
             if (headers[k] != NULL) {
                 t = strlen(headers[k]);
                 memcpy(p, headers[k], t);
@@ -489,7 +525,7 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     for (i = 0; i < size; ++i) {
         memset(output, ' ', fmt_size[0]);
 
-        for (n = fmt_size[0], p = output, k = 1; k <= 5; ++k) {
+        for (n = fmt_size[0], p = output, k = 1; k <= K - 2; ++k) {
             if (headers[k] != NULL) {
                 t = *(size_t*)((char*)&records[i] + offsets[k]);
 
@@ -517,7 +553,7 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     if (config->verbose_mode && size > 1) {
         memset(output, ' ', fmt_size[0]);
 
-        for (n = fmt_size[0], p = output, k = 1; k <= 5; ++k) {
+        for (n = fmt_size[0], p = output, k = 1; k <= K - 2; ++k) {
             if (headers[k] != NULL) {
                 t = *(size_t*)((char*)&total + offsets[k]);
 
@@ -553,18 +589,13 @@ int main(int argc, char** argv)
     Record* records = NULL;
     size_t n_records = 0;
 
-    Config config = {
-        .tab_width = TAB_WIDTH,
-        .count_bytes = true,
-        .count_chars = true,
-        .count_words = true,
-        .count_lines = true,
-        .count_width = true,
-        .numb_mode = false,
-        .verbose_mode = true,
-    };
+    Config config;
+    config.tab_width = TAB_WIDTH;
 
-    parse_options(&argc, &argv, &config);
+    if (!parse_options(&argc, &argv, &config)) {
+        log("\n%s", usage);
+        exit(1);
+    }
 
     n_records = argc > 0 ? argc : 1;
 
