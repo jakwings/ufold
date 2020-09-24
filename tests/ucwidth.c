@@ -49,9 +49,9 @@ typedef struct struct_config {
     bool ascii_mode;
 } Config;
 
-static void parse_options(int* argc, char*** argv, Config* config)
+static bool parse_options(int* argc, char*** argv, Config* config)
 {
-    struct optparse_long optspecs[] = {
+    static const struct optparse_long optspecs[] = {
         {"width",    'w',  OPTPARSE_REQUIRED},
         {"tab",      't',  OPTPARSE_REQUIRED},
         {"hang",     'p',  OPTPARSE_OPTIONAL},
@@ -63,56 +63,69 @@ static void parse_options(int* argc, char*** argv, Config* config)
         {0}
     };
 
-    int c = -1;
-    struct optparse opt;
+    size_t max_width = config->max_width;
+    size_t tab_width = config->tab_width;
+    char* punctuation = NULL;
+    bool to_hang_punctuation = false;
     bool to_print_help = false;
     bool to_print_version = false;
+    bool to_keep_indentation = false;
+    bool to_break_at_spaces = false;
+    bool to_count_bytes = false;
 
+    int c = -1;
+    int t = -1;
+    struct optparse opt;
     optparse_init(&opt, *argv);
+
     while ((c = optparse_long(&opt, optspecs, NULL)) != -1) {
         switch (c) {
-            case 'i': config->keep_indentation = true; break;
-            case 's': config->break_at_spaces = true; break;
-            case 'b': config->ascii_mode = true; break;
+            case 'i': to_keep_indentation = true; break;
+            case 's': to_break_at_spaces = true; break;
+            case 'b': to_count_bytes = true; break;
             case 'V': to_print_version = true; break;
             case 'h': to_print_help = true; break;
             case 'p':
                 if (opt.optarg == NULL) {
-                    config->punctuation = NULL;
-                    config->hang_punctuation = true;
+                    punctuation = NULL;
+                    to_hang_punctuation = true;
                 } else if (strlen(opt.optarg) > 0) {
-                    if (!check_punctuation(opt.optarg, strlen(opt.optarg), config->ascii_mode)) {
-                        warn("option requires non-whitespace characters in the UTF-8 encoding -- '%c'", c);
-                        exit(1);
-                    }
-                    config->punctuation = opt.optarg;
-                    config->hang_punctuation = true;
+                    t = c;
+                    punctuation = opt.optarg;
+                    to_hang_punctuation = true;
                 } else {
-                    config->punctuation = NULL;
-                    config->hang_punctuation = false;
+                    punctuation = NULL;
+                    to_hang_punctuation = false;
                 }
                 break;
             case 't':
-                if (!parse_integer(opt.optarg, &config->tab_width)) {
+                if (!parse_integer(opt.optarg, &tab_width)) {
                     warn("option requires a non-negative integer -- '%c'", c);
-                    exit(1);
+                    return false;
                 }
                 break;
             case 'w':
-                if (!parse_integer(opt.optarg, &config->max_width)) {
+                if (!parse_integer(opt.optarg, &max_width)) {
                     warn("option requires a non-negative integer -- '%c'", c);
-                    exit(1);
+                    return false;
                 }
                 break;
             case '?':
                 warn("%s", opt.errmsg);
-                exit(1);
+                return false;
             default:
                 error("unhandled option");
         }
     }
     *argc -= opt.optind;
     *argv += opt.optind;
+
+    if (punctuation != NULL && !check_punctuation(punctuation,
+                                                  strlen(punctuation),
+                                                  to_count_bytes)) {
+        warn("option requires well-formed non-control characters -- '%c'", t);
+        return false;
+    }
 
     if (to_print_help) {
         printf("%s", usage);
@@ -122,6 +135,16 @@ static void parse_options(int* argc, char*** argv, Config* config)
         printf("%s\n", VERSION);
         exit(0);
     }
+
+    config->max_width = max_width;
+    config->tab_width = tab_width;
+    config->punctuation = punctuation;
+    config->hang_punctuation = to_hang_punctuation;
+    config->keep_indentation = to_keep_indentation;
+    config->break_at_spaces = to_break_at_spaces;
+    config->ascii_mode = to_count_bytes;
+
+    return true;
 }
 
 static bool count_width(FILE* stream, const Config* config, bool* exceeded)
@@ -274,17 +297,14 @@ int main(int argc, char** argv)
     bool exceeded = false;
     int i = -1;
 
-    Config config = {
-        .max_width = MAX_WIDTH,
-        .tab_width = TAB_WIDTH,
-        .punctuation = NULL,
-        .hang_punctuation = false,
-        .keep_indentation = false,
-        .break_at_spaces = false,
-        .ascii_mode = false,
-    };
+    Config config;
+    config.max_width = MAX_WIDTH;
+    config.tab_width = TAB_WIDTH;
 
-    parse_options(&argc, &argv, &config);
+    if (!parse_options(&argc, &argv, &config)) {
+        log("\n%s", usage);
+        exit(1);
+    }
 
     if (argc > 0) {
         for (i = 0; i < argc; ++i) {

@@ -208,7 +208,7 @@ static void print_version(ufold_vm_config_t config)
 
 static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
 {
-    struct optparse_long optspecs[] = {
+    static const struct optparse_long optspecs[] = {
         {"width",    'w',  OPTPARSE_REQUIRED},
         {"tab",      't',  OPTPARSE_REQUIRED},
         {"hang",     'p',  OPTPARSE_OPTIONAL},
@@ -234,8 +234,8 @@ static bool parse_options(int* argc, char*** argv, ufold_vm_config_t* config)
     int c = -1;
     int t = -1;
     struct optparse opt;
-
     optparse_init(&opt, *argv);
+
     while ((c = optparse_long(&opt, optspecs, NULL)) != -1) {
         switch (c) {
             case 'i': to_keep_indentation = true; break;
@@ -356,11 +356,6 @@ int main(int argc, char** argv)
 
     config.max_width = MAX_WIDTH;
     config.tab_width = TAB_WIDTH;
-    config.punctuation = NULL;
-    config.hang_punctuation = false;
-    config.keep_indentation = false;
-    config.break_at_spaces = false;
-    config.ascii_mode = false;
     config.line_buffered = true;
     config.write = NULL;
     config.realloc = NULL;
