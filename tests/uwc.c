@@ -45,6 +45,7 @@ static const char* const usage =
 "    -w, --words           Count words.\n"
 "    -l, --lines           Count lines.\n"
 "    -m, --width           Count the maximum line width.\n"
+"    -G, --grapheme        Define chars as grapheme clusters.\n"
 "    -L, --linear          No end-of-file be end-of-line.\n"
 "    -n, --numb            Darn non-ASCII encoded text.\n"
 "    -s, --strict          Warn about strange input.\n"
@@ -71,6 +72,7 @@ typedef struct struct_config {
     bool count_words;
     bool count_lines;
     bool count_width;
+    bool clusterfunk;
     bool eof_not_eol;  // my life will go on
     bool numb_mode;    // ascii & wtf-8
     bool strict_mode;
@@ -111,6 +113,7 @@ static bool parse_options(int* argc, char*** argv, Config* config)
     bool to_strict_mode = false;
     bool to_verbose_mode = false;
     bool to_eof_is_to_eol = true;
+    bool to_clusterfunk = false;
 
     int c = -1;
     struct optparse opt;
@@ -131,6 +134,7 @@ static bool parse_options(int* argc, char*** argv, Config* config)
             case 'l': to_count_lines = true; break;
             case 'm': to_count_width = true; break;
             case 'n': to_numb_mode = true; break;
+            case 'G': to_clusterfunk = true; break;
             case 'L': to_eof_is_to_eol = false; break;
             case 's': to_strict_mode = true; break;
             case 'v': to_verbose_mode = true; break;
@@ -168,6 +172,7 @@ static bool parse_options(int* argc, char*** argv, Config* config)
     config->count_lines = to_count_everything || to_count_lines;
     config->count_width = to_count_everything || to_count_width;
     config->eof_not_eol = !to_eof_is_to_eol;
+    config->clusterfunk = to_clusterfunk;
     config->numb_mode = to_numb_mode;
     config->strict_mode = to_strict_mode;
     config->verbose_mode = to_verbose_mode;
@@ -225,6 +230,8 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
 
     utf8proc_uint8_t buf[BUFSIZE];
     utf8proc_int32_t codepoint = -1;
+    utf8proc_int32_t old_point = -1;
+    utf8proc_int32_t brk_state = 0;
     utf8proc_ssize_t n_bytes = -1;
     size_t size = 0;
     size_t index = 0;
@@ -262,6 +269,10 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                         }
                         break;
                     } else if (n_bytes < 0 || n_bytes > 4) {
+                        is_valid_cp = false;
+                        is_valid_ch = false;
+                        codepoint = -1;
+
                         if (size - index >= 4) {
                             if (n_bytes > 0 && size - index < n_bytes) {
                                 error("broken utf8proc");
@@ -269,10 +280,7 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                             if (config->strict_mode) {
                                 warn("%s: 0x[%02X]...", "invalid UTF-8 byte sequence from input", buf[index]);
                             }
-                            is_valid_cp = false;
-                            is_valid_ch = false;
                             n_bytes = 1;
-                            codepoint = -1;
                         } else {
                             break;
                         }
@@ -307,11 +315,11 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                     }
                 }
 
-                if (is_valid_ch && !add(&chars, 1)) {
+                if (config->count_chars && is_valid_ch && !add(&chars, 1)) {
                     error("integer overflow");
                 }
 
-                if (config->count_graphs || config->count_words || config->count_width) {
+                if ((config->count_graphs && is_valid_ch) || config->count_words || config->count_width) {
                     size_t cwidth = SIZE_MAX - offset + 1;
 
                     if (codepoint == '\t') {
@@ -349,8 +357,21 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
 
                     if (config->count_graphs || config->count_words) {
                         if (ist_wordchar(codepoint, config->numb_mode)) {
-                            if (config->count_graphs && !add(&graphs, 1)) {
-                                error("integer overflow");
+                            if (config->count_graphs) {
+                                bool to_break = false;
+
+                                if (config->clusterfunk && !config->numb_mode) {
+                                    if (old_point < 0 || utf8proc_grapheme_break_stateful(old_point, codepoint, &brk_state)) {
+                                        to_break = true;
+                                        brk_state = 0;
+                                    }
+                                } else {
+                                    to_break = true;
+                                }
+
+                                if (is_valid_ch && to_break && !add(&graphs, 1)) {
+                                    error("integer overflow");
+                                }
                             }
                             if (config->count_words) {
                                 word_len += cwidth;
@@ -364,6 +385,10 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                                 word_len = 0;
                                 at_word = false;
                             }
+                        }
+
+                        if (config->clusterfunk) {
+                            old_point = is_valid_ch && at_word ? codepoint : -1;
                         }
                     }
                 }

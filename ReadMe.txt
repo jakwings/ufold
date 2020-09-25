@@ -101,10 +101,12 @@ ______________________________________________________________________________
   OPTIONS
       -t, --tab <width>     Maximum columns for each tab.
       -b, --bytes           Count bytes.
-      -c, --chars           Count characters.
+      -c, --chars           Count chars (codepoints).
+      -g, --graphs          Count word chars.
       -w, --words           Count words.
       -l, --lines           Count lines.
       -m, --width           Count the maximum line width.
+      -G, --grapheme        Define chars as grapheme clusters.
       -L, --linear          No end-of-file be end-of-line.
       -n, --numb            Darn non-ASCII encoded text.
       -s, --strict          Warn about strange input.
