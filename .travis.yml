@@ -1,5 +1,10 @@
 language: cpp
 
+matrix:
+  include:
+    - env: CC=gcc CXX=g++
+    - env: CC=clang CXX=clang++
+
 script:
   - make DEBUG=1 CHECK_LEAK=1 clean all test | sed 's/^.*\r//'
   - make CFLAGS='-Ofast -march=native' clean all test | sed 's/^.*\r//'

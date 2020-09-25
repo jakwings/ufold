@@ -225,7 +225,6 @@ static bool ist_wordchar(utf8proc_int32_t c, bool numb_mode)
 
 static bool measure_file(FILE* stream, const char* filepath, const Config* config, Record* record)
 {
-    // TODO: count grapheme clusters
     size_t bytes = 0, chars = 0, graphs = 0, words = 0, lines = 0, width = 0;
 
     utf8proc_uint8_t buf[BUFSIZE];
@@ -259,6 +258,9 @@ static bool measure_file(FILE* stream, const char* filepath, const Config* confi
                 bool is_cc = false;
                 bool is_valid_ch = true;
                 bool is_valid_cp = true;
+
+                (void)is_cc;
+                (void)is_valid_cp;
 
                 if (!config->numb_mode) {
                     n_bytes = utf8proc_iterate(buf + index, size - index, &codepoint);

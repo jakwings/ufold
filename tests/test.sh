@@ -1,5 +1,7 @@
 #!/bin/sh
 
+set -e
+
 cd -- "$(dirname -- "$0")"
 
 echo() {
@@ -20,8 +22,7 @@ seed="${1:-$(date '+%s')}"
 printf '[SEED=%s]\n\n' "${seed}"
 
 if [ ! -x "${ufold}" ]; then
-    ufold="$(command -v ufold)"
-    if [ "$?" -ne 0 ]; then
+    if ! ufold="$(command -v ufold)"; then
         printf 'ufold not found\n'
         exit 1
     fi
@@ -41,14 +42,15 @@ ofold() {
     timeout "${seconds}" "${ofold}" "$@"
 }
 
-exit_if_failed() {
+fail() {
     exitcode=$?
-    if [ "${exitcode}" -ne 0 ]; then
-        printf 'Failed\n'
-        "${uwc}" -Gv tmp_stdin tmp_stdout
-        cat tmp_stderr
-        exit "${exitcode}"
-    elif [ -f tmp_expect ]; then
+    printf 'Failed\n'
+    "${uwc}" -Gv tmp_stdin tmp_stdout
+    cat tmp_stderr
+    exit "${exitcode}"
+}
+check() {
+    if [ -f tmp_expect ]; then
         if ! diff -u tmp_expect tmp_stdout > tmp_diff 2>&1; then
             printf 'Failed\n'
             "${uwc}" -bcwlnv tmp_stdin tmp_expect tmp_stdout
@@ -62,11 +64,11 @@ exit_if_failed() {
 if [ -r tmp_flags ]; then
     flags="$(cat tmp_flags)"
     printf 'Retry the previous failed test: ufold %s ... ' "${flags}"
-    ufold $flags < tmp_stdin > tmp_stdout 2> tmp_stderr
-    exit_if_failed
+    ufold $flags < tmp_stdin > tmp_stdout 2> tmp_stderr || fail
+    check
     rm -f tmp_expect
-    "${ucwidth}" $flags < tmp_stdout > /dev/null 2> tmp_stderr
-    exit_if_failed
+    "${ucwidth}" $flags < tmp_stdout > /dev/null 2> tmp_stderr || fail
+    check
     printf 'Done\n'
 fi
 
@@ -89,8 +91,8 @@ while read -r flags; do
     { cat "${output}"; echo; cat "${output}"; } > tmp_expect
     { cat "${input}"; echo; cat "${input}"; } |
         tee tmp_stdin |
-            ufold $flags > tmp_stdout 2> tmp_stderr
-    exit_if_failed
+            ufold $flags > tmp_stdout 2> tmp_stderr || fail
+    check
 
     printf 'Done\n'
 
@@ -133,16 +135,18 @@ for args; do
             head -c"${read_delta}" > tmp_stdin
 
         if [ -n "${ofold}" ] && case "${args}" in (*[hV]*) false; esac; then
-            ofold $args < tmp_stdin 2> tmp_stderr | tee tmp_expect > tmp_stdout
-            exit_if_failed
+            {
+                ofold $args < tmp_stdin 2> tmp_stderr |
+                    tee tmp_expect > tmp_stdout
+            } || fail
         fi
 
-        ufold $args < tmp_stdin > tmp_stdout 2> tmp_stderr
-        exit_if_failed
+        ufold $args < tmp_stdin > tmp_stdout 2> tmp_stderr || fail
+        check
 
         rm -f tmp_expect
-        "${ucwidth}" $args < tmp_stdout > /dev/null 2> tmp_stderr
-        exit_if_failed
+        "${ucwidth}" $args < tmp_stdout > /dev/null 2> tmp_stderr || fail
+        check
 
         read_total=$(( read_total + read_delta ))
         i=$(( i + 1 ))
