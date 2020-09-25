@@ -171,7 +171,7 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
             logged_return(NULL);
         }
         memcpy(vm->config.punctuation, conf.punctuation, len - 1);
-        vm->config.punctuation[len] = '\0';
+        vm->config.punctuation[len - 1] = '\0';
     }
 
     if ((vm->slots = conf.realloc(NULL, SLOT_SIZE)) == NULL) {
