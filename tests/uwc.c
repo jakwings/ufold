@@ -27,11 +27,13 @@ do { \
 
 #define BUFSIZE 4096
 
+#define PROGRAM "uwc"
+
 // https://pubs.opengroup.org/onlinepubs/9699919799/utilities/wc.html
 
 static const char* const usage =
 "USAGE\n"
-"    uwc [options] [files]\n"
+"    " PROGRAM " [options] [files]\n"
 "\n"
 "    Count bytes, characters, words, lines and the maximum width.\n"
 "    By default, input must be encoded using the UTF-8 format.\n"
@@ -155,7 +157,7 @@ static bool parse_options(int* argc, char*** argv, Config* config)
         exit(0);
     }
     if (to_print_version) {
-        printf("%s\n", VERSION);
+        printf("%s", PROGRAM " " VERSION "\n");
         exit(0);
     }
 
@@ -532,12 +534,11 @@ static bool write_records(const Record* records, size_t size, const Config* conf
     if (config->verbose_mode) {
         memset(output, ' ', fmt_size[0]);
 
-        for (n = fmt_size[0], p = output, k = 1; k <= K - 1; ++k) {
+        for (p = output, k = 1; k <= K - 1; ++k) {
             if (headers[k] != NULL) {
                 t = strlen(headers[k]);
                 memcpy(p, headers[k], t);
                 p += fmt_size[k];
-                n -= fmt_size[k];
             }
         }
         while (*p == ' ') *p-- = '\0';

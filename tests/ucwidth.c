@@ -21,9 +21,11 @@ do { \
 
 #define BUFSIZE 4096
 
+#define PROGRAM "ucwidth"
+
 static const char* const usage =
 "USAGE\n"
-"    ucwidth [options] [files]\n"
+"    " PROGRAM " [options] [files]\n"
 "\n"
 "    Count widths of lines from the output of ufold.\n"
 "    When no file is specified, read from standard input.\n"
@@ -132,7 +134,7 @@ static bool parse_options(int* argc, char*** argv, Config* config)
         exit(0);
     }
     if (to_print_version) {
-        printf("%s\n", VERSION);
+        printf("%s", PROGRAM " " VERSION "\n");
         exit(0);
     }
 

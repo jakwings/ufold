@@ -20,26 +20,31 @@
 
 typedef char byte;
 
-//\ High/Low Surrogates are invalid for UTF-8 but allowed here for convenience.
+//\ High/Low Surrogates (U+D800-DBFF & U+DC00-DFFF) are invalid for UTF-8 but allowed here for convenience.
 size_t utf8encode(size_t codepoint, byte* sequence) {
-    if (codepoint < 0x80) {
+    if (codepoint <= 0x7F) {
         sequence[0] = codepoint;
         return 1;
-    } else if (codepoint < 0x800) {
-        sequence[0] = 0xC0 + (codepoint >> 6);
-        sequence[1] = 0x80 + (codepoint & 0x3F);
+    } else if (codepoint <= 0x07FF) {
+        // 00000XXX XXXXXXXX
+        sequence[0] = 0xC0 | (codepoint >> 6);
+        sequence[1] = 0x80 | (codepoint & 0x3F);
+        // 110XXXXX 10XXXXXX
         return 2;
-    } else if (codepoint < 0x10000) {
-        // U+D800-DBFF and U+DC00-DFFF are allowed here for convenience.
-        sequence[0] = 0xE0 + (codepoint >> 12);
-        sequence[1] = 0x80 + ((codepoint >> 6) & 0x3F);
-        sequence[2] = 0x80 + (codepoint & 0x3F);
+    } else if (codepoint <= 0xFFFF) {
+        // XXXXXXXX XXXXXXXX
+        sequence[0] = 0xE0 | (codepoint >> 12);
+        sequence[1] = 0x80 | ((codepoint >> 6) & 0x3F);
+        sequence[2] = 0x80 | (codepoint & 0x3F);
+        // 1110XXXX 10XXXXXX 10XXXXXX
         return 3;
-    } else if (codepoint < 0x110000) {
-        sequence[0] = 0xF0 + (codepoint >> 18);
-        sequence[1] = 0x80 + ((codepoint >> 12) & 0x3F);
-        sequence[2] = 0x80 + ((codepoint >> 6) & 0x3F);
-        sequence[3] = 0x80 + (codepoint & 0x3F);
+    } else if (codepoint <= 0x10FFFF) {
+        // 000XXXXX XXXXXXXX XXXXXXXX
+        sequence[0] = 0xF0 | (codepoint >> 18);
+        sequence[1] = 0x80 | ((codepoint >> 12) & 0x3F);
+        sequence[2] = 0x80 | ((codepoint >> 6) & 0x3F);
+        sequence[3] = 0x80 | (codepoint & 0x3F);
+        // 11110XXX 10XXXXXX 10XXXXXX 10XXXXXX
         return 4;
     } else {
         return 0;

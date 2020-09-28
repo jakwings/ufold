@@ -133,11 +133,12 @@ ufold_vm_t* ufold_vm_new(const ufold_vm_config_t* config)
     // |<------------- LINE AREA ------------->|< OVERFLOW AREA >|
     // [QUADRUPED QUADRUPED QUADRUPED ......... QUADRUPEDS & NUL ]
     size_t width = (config->max_width > 0) ? config->max_width : 0;
+    size_t factor = config->ascii_mode ? 1 : 4;
     // check overflow
-    if (width > 0 && (SIZE_MAX - 1) / width / 4 < sizeof(uint8_t)) {
+    if (width > 0 && (SIZE_MAX - 1) / width / factor < sizeof(uint8_t)) {
         logged_return(NULL);
     }
-    size_t size = sizeof(uint8_t) * 4 * width + SLOT_SIZE + 1;
+    size_t size = sizeof(uint8_t) * factor * width + SLOT_SIZE + 1;
     // check overflow
     if (size <= SLOT_SIZE) {
         logged_return(NULL);
