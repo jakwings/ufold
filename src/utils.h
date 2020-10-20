@@ -14,7 +14,9 @@ do { \
 } while (0)
 
 #ifdef UFOLD_DEBUG
-#   undef NDEBUG
+#   ifdef NDEBUG
+#       error "UFOLD_DEBUG and NDEBUG cannot be defined at the same time"
+#   endif
 #   include <assert.h>
 #   define debug_assert(yes) assert(yes)
 #   define logged_return(x) \
